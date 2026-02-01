@@ -6,6 +6,9 @@ mostafaalishahi/Delirium_prediction_models/Data/preprocessed/icu_lab.csv
 mostafaalishahi/Delirium_prediction_models/Data/preprocessed/mimic_pivoted_sofa.csv
 mostafaalishahi/Delirium_prediction_models/Data/preprocessed/mimic_wes.csv
 
+
+.Ds_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
