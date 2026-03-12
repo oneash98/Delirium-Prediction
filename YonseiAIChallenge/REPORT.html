@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap');
+body {
+    font-family: 'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', sans-serif;
+    line-height: 1.7;
+    max-width: 190mm;
+    margin: 0 auto;
+    padding: 10mm;
+    font-size: 10pt;
+    color: #333;
+}
+h1 { font-size: 20pt; border-bottom: 2px solid #2c3e50; padding-bottom: 8px; margin-top: 25px; color: #2c3e50; }
+h2 { font-size: 15pt; border-bottom: 1px solid #34495e; padding-bottom: 5px; margin-top: 20px; color: #34495e; }
+h3 { font-size: 12pt; margin-top: 15px; color: #555; }
+h4 { font-size: 11pt; margin-top: 12px; color: #666; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 9pt; }
+th, td { border: 1px solid #bdc3c7; padding: 8px 10px; text-align: left; }
+th { background-color: #ecf0f1; font-weight: bold; color: #2c3e50; }
+tr:nth-child(even) { background-color: #f9f9f9; }
+code { background-color: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: 'Consolas', 'Courier New', monospace; font-size: 9pt; color: #c7254e; }
+pre { background-color: #2c3e50; color: #ecf0f1; padding: 12px; border-radius: 5px; overflow-x: auto; font-size: 8pt; }
+pre code { background-color: transparent; color: #ecf0f1; padding: 0; }
+blockquote { border-left: 4px solid #3498db; margin-left: 0; padding-left: 15px; color: #555; background-color: #f8f9fa; padding: 10px 15px; }
+strong { color: #2c3e50; }
+hr { border: none; border-top: 1px solid #ddd; margin: 20px 0; }
+ul, ol { padding-left: 25px; }
+li { margin-bottom: 5px; }
+</style>
+</head>
+<body>
+<h1 id="mimic-iv-icu">MIMIC-IV 기반 ICU 섬망 예측 모델 연구 보고서</h1>
+<blockquote>
+<p><strong>프로젝트</strong>: YonseiAI Challenge - Delirium Prediction
+<strong>데이터셋</strong>: MIMIC-IV (Medical Information Mart for Intensive Care)
+<strong>작성일</strong>: 2026-02-05</p>
+</blockquote>
+<hr />
+<h2 id="_1">목차</h2>
+<ol>
+<li><a href="#1-연구-개요">연구 개요</a></li>
+<li><a href="#2-데이터-추출">데이터 추출</a></li>
+<li><a href="#3-데이터-전처리">데이터 전처리</a></li>
+<li><a href="#4-탐색적-데이터-분석">탐색적 데이터 분석</a></li>
+<li><a href="#5-모델링">모델링</a></li>
+<li><a href="#6-결과">결과</a></li>
+<li><a href="#7-결론-및-논의">결론 및 논의</a></li>
+</ol>
+<hr />
+<h2 id="1">1. 연구 개요</h2>
+<h3 id="11">1.1 연구 목적</h3>
+<p>중환자실(ICU) 환자에서 섬망(Delirium)은 사망률 증가, 재원 기간 연장, 인지 기능 저하와 연관된 중요한 임상 문제입니다. 본 연구는 MIMIC-IV 데이터베이스를 활용하여 <strong>CAM-ICU (Confusion Assessment Method for ICU) 평가 시점을 기준으로 섬망 발생을 예측</strong>하는 머신러닝 모델을 개발하고 평가하는 것을 목적으로 합니다.</p>
+<h3 id="12">1.2 연구 설계</h3>
+<ul>
+<li><strong>예측 타겟</strong>: CAM-ICU 양성 여부 (0: 음성, 1: 양성)</li>
+<li><strong>예측 윈도우</strong>: CAM-ICU 평가 시점 이전 8시간 데이터 기반</li>
+<li><strong>분석 단위</strong>: 개별 CAM-ICU 평가 시점 (환자당 다수 평가 포함)</li>
+</ul>
+<h3 id="13">1.3 전체 파이프라인</h3>
+<pre><code>1_mimiciv_extraction.sql     2_Data_transform.ipynb        3_Models.ipynb
+─────────────────────────   ─────────────────────────   ──────────────────────────
+
+MIMIC-IV 원본 테이블          all_events.csv               final_dataset.csv
+  │                         + adm_pat_icu.csv               │
+  ├─ 코호트 정의              │                             ├─ Data Split
+  ├─ 원본 데이터 추출          ├─ VALUE 변환                  ├─ Outlier 처리
+  ├─ ICU 체류 필터링           ├─ 단위 변환                   ├─ Optuna 튜닝
+  ├─ 변수 선택                ├─ 라벨 통합                   ├─ K-Fold CV
+  └─ 통합                    ├─ 시간 계산                   └─ Final Training
+       │                     ├─ 60분 비닝                        │
+       ▼                     ├─ CAM-ICU 분류                     ▼
+  all_events.csv             ├─ Imputation               models/optuna/
+  adm_pat_icu.csv            └─ 8h 윈도우 집계             models/quick/
+                                   │
+                                   ▼
+                              final_dataset.csv
+</code></pre>
+<hr />
+<h2 id="2">2. 데이터 추출</h2>
+<h3 id="21">2.1 데이터 소스</h3>
+<p>MIMIC-IV 데이터베이스의 다음 테이블을 사용하였습니다:</p>
+<table>
+<thead>
+<tr>
+<th>테이블</th>
+<th>설명</th>
+<th>사용 목적</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CHARTEVENTS</td>
+<td>활력징후, 섬망평가, 의식수준 등</td>
+<td>CAM-ICU, RASS, 활력징후</td>
+</tr>
+<tr>
+<td>LABEVENTS</td>
+<td>검사실 결과</td>
+<td>혈액, 전해질, 간/신장 수치</td>
+</tr>
+<tr>
+<td>INPUTEVENTS</td>
+<td>약물 투여 기록</td>
+<td>진정제, 승압제</td>
+</tr>
+<tr>
+<td>PATIENTS</td>
+<td>환자 기본 정보</td>
+<td>연령, 성별</td>
+</tr>
+<tr>
+<td>ICUSTAYS</td>
+<td>ICU 체류 정보</td>
+<td>입퇴실 시간, 재원기간</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22">2.2 코호트 정의</h3>
+<p><strong>포함 기준:</strong>
+- CAM-ICU 평가 기록이 있는 ICU stay
+- 18세 이상 성인
+- ICU 재원기간(LOS) 8일 이상</p>
+<p><strong>원본 데이터 규모:</strong></p>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>데이터</th>
+<th>규모</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>원본</td>
+<td>all_events</td>
+<td><strong>38,276,100</strong>개 이벤트</td>
+</tr>
+<tr>
+<td>원본</td>
+<td>adm_pat_icu</td>
+<td><strong>72,729</strong>개 ICU stay</td>
+</tr>
+</tbody>
+</table>
+<h3 id="23">2.3 추출 변수</h3>
+<h4 id="chartevents">활력징후 (CHARTEVENTS)</h4>
+<ul>
+<li>Heart Rate, Temperature, Mean BP, Oxygen Saturation</li>
+<li>Richmond-RAS Scale (RASS)</li>
+<li>CAM-ICU 하위 항목 (Inattention, MS Change, RASS LOC, Disorganized thinking)</li>
+</ul>
+<h4 id="labevents">검사실 결과 (LABEVENTS)</h4>
+<ul>
+<li>혈액: WBC, Hemoglobin, Hematocrit, Platelets</li>
+<li>전해질: Sodium, Potassium, Chloride, Bicarbonate, Calcium, Magnesium, Phosphate</li>
+<li>신장/간: BUN, Creatinine, ALT</li>
+<li>기타: Glucose, Lactate, pH, pCO2, pO2</li>
+</ul>
+<h4 id="inputevents">약물 투여 (INPUTEVENTS)</h4>
+<ul>
+<li>진정제: Propofol, Benzodiazepines (Midazolam, Lorazepam, Diazepam), Ketamine</li>
+<li>진통제: Opiates (Fentanyl, Morphine)</li>
+<li>승압제: Vasopressors (Vasopressin, Dobutamine, Phenylephrine)</li>
+</ul>
+<hr />
+<h2 id="3">3. 데이터 전처리</h2>
+<h3 id="31">3.1 단위 변환</h3>
+<p>일관성 있는 분석을 위해 다음 단위 변환을 수행하였습니다:</p>
+<table>
+<thead>
+<tr>
+<th>변환</th>
+<th>공식</th>
+<th>해당 행 수</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Temperature °F → °C</td>
+<td>(F - 32) × 5/9</td>
+<td>738,677</td>
+</tr>
+<tr>
+<td>Weight lbs → kg</td>
+<td>lbs × 0.453592</td>
+<td>19,365</td>
+</tr>
+<tr>
+<td>Height inch → cm</td>
+<td>inch × 2.54</td>
+<td>101</td>
+</tr>
+</tbody>
+</table>
+<h3 id="32">3.2 라벨 통합</h3>
+<p>동일한 의미를 가진 여러 변수를 단일 라벨로 통합하였습니다:</p>
+<table>
+<thead>
+<tr>
+<th>통합 라벨</th>
+<th>원본 라벨</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RASS</td>
+<td>Richmond-RAS Scale, Goal Richmond-RAS Scale</td>
+</tr>
+<tr>
+<td>Weight</td>
+<td>Admission Weight (Kg), Admission Weight (lbs.), Daily Weight</td>
+</tr>
+<tr>
+<td>Temperature</td>
+<td>Temperature Fahrenheit, Temperature Celsius</td>
+</tr>
+<tr>
+<td>Opiates</td>
+<td>Fentanyl, Fentanyl (Concentrate), Morphine Sulfate</td>
+</tr>
+<tr>
+<td>Benzodiazepines</td>
+<td>Midazolam (Versed), Lorazepam (Ativan), Diazepam (Valium)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="33">3.3 시계열 변환</h3>
+<ul>
+<li>ICU 입실(intime) 기준 시간(hours) 계산</li>
+<li>60분 단위 비닝 (bin = floor(hours))</li>
+<li>Wide format 피봇 테이블 생성</li>
+</ul>
+<p><strong>시계열 데이터 규모:</strong></p>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>행 수</th>
+<th>ICU stay 수</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LOS ≥ 8일 필터링 후</td>
+<td>17,400,216</td>
+<td>7,661</td>
+</tr>
+<tr>
+<td>시계열 피봇 후</td>
+<td><strong>2,868,290</strong></td>
+<td><strong>7,661</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="34-cam-icu">3.4 CAM-ICU 분류</h3>
+<p>CAM-ICU 양성 판정 기준:</p>
+<pre><code>CAM-ICU Positive = (Feature1 AND Feature2) AND (Feature3 OR Feature4)
+
+Feature1: CAM-ICU MS Change == 1        (의식 변화)
+Feature2: CAM-ICU Inattention == 1 or 4 (주의력 장애)
+Feature3: CAM-ICU RASS LOC == 1         (의식 수준 변화)
+Feature4: CAM-ICU Disorganized thinking == 1 (비조직적 사고)
+</code></pre>
+<p><strong>CAM-ICU 평가 현황:</strong></p>
+<table>
+<thead>
+<tr>
+<th>구분</th>
+<th>개수</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>전체 시계열 레코드</td>
+<td>2,868,290</td>
+</tr>
+<tr>
+<td>CAM-ICU 평가 시점</td>
+<td>200,909</td>
+</tr>
+<tr>
+<td>- 양성 (Positive)</td>
+<td>6,767 (3.37%)</td>
+</tr>
+<tr>
+<td>- 음성 (Negative)</td>
+<td>194,142 (96.63%)</td>
+</tr>
+<tr>
+<td>미평가 시점 (NaN)</td>
+<td>2,667,381</td>
+</tr>
+</tbody>
+</table>
+<p><strong>환자 수준 분포:</strong>
+- 섬망 경험 환자 (ever delirious): 2,471명
+- 섬망 비경험 환자 (never delirious): 5,185명</p>
+<h3 id="35-imputation">3.5 결측치 처리 (Imputation)</h3>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>대상 변수</th>
+<th>처리 방법</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>약물/장비</td>
+<td>NaN → 0 (미기록 = 미사용)</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Weight, Height</td>
+<td>환자별 forward-fill + backward-fill</td>
+</tr>
+<tr>
+<td>3</td>
+<td>임상 측정값</td>
+<td>환자별 forward-fill</td>
+</tr>
+<tr>
+<td>4</td>
+<td>임상 측정값</td>
+<td>환자별 backward-fill (초기 시간대)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="36-8">3.6 8시간 윈도우 집계</h3>
+<p>CAM-ICU 평가 시점(cam_bin)으로부터 이전 8시간(cam_bin-7 ~ cam_bin) 데이터를 하나의 행으로 집계하였습니다.</p>
+<p><strong>필터링:</strong> <code>cam_bin &gt;= 7</code> (입실 후 8시간 미만 평가 제외)</p>
+<p><strong>집계 규칙:</strong></p>
+<table>
+<thead>
+<tr>
+<th>구분</th>
+<th>변수</th>
+<th>집계 방법</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>활력징후</td>
+<td>Heart Rate, Mean BP, Oxygen Saturation, Temperature</td>
+<td>8h mean + std</td>
+</tr>
+<tr>
+<td>약물/장비</td>
+<td>Propofol, Opiates, Benzodiazepines 등</td>
+<td>8h 내 사용 여부 → 1/0</td>
+</tr>
+<tr>
+<td>검사/의식</td>
+<td>Weight, RASS, Lab 결과</td>
+<td>최신 시점 값</td>
+</tr>
+</tbody>
+</table>
+<p><strong>제외된 변수 (결측률 높음):</strong></p>
+<table>
+<thead>
+<tr>
+<th>변수</th>
+<th>결측률</th>
+<th>제외 사유</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Height</td>
+<td>98.6%</td>
+<td>대부분 미측정</td>
+</tr>
+<tr>
+<td>Ammonia</td>
+<td>91.2%</td>
+<td>대부분 미측정</td>
+</tr>
+<tr>
+<td>Albumin</td>
+<td>19.0%</td>
+<td>높은 결측률</td>
+</tr>
+<tr>
+<td>Bilirubin</td>
+<td>12.4%</td>
+<td>높은 결측률</td>
+</tr>
+<tr>
+<td>AST</td>
+<td>11.3%</td>
+<td>높은 결측률</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4">4. 탐색적 데이터 분석</h2>
+<h3 id="41">4.1 최종 데이터셋 규모</h3>
+<table>
+<thead>
+<tr>
+<th>항목</th>
+<th>값</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>총 샘플 수 (CAM-ICU 평가)</strong></td>
+<td><strong>195,440</strong></td>
+</tr>
+<tr>
+<td><strong>고유 ICU stay 수</strong></td>
+<td><strong>7,644</strong></td>
+</tr>
+<tr>
+<td><strong>특성(Feature) 수</strong></td>
+<td><strong>37</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="42">4.2 타겟 변수 분포</h3>
+<h4 id="sample-level">샘플 수준 (Sample-level)</h4>
+<table>
+<thead>
+<tr>
+<th>클래스</th>
+<th>개수</th>
+<th>비율</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CAM-ICU 음성 (0)</td>
+<td>188,739</td>
+<td>96.57%</td>
+</tr>
+<tr>
+<td>CAM-ICU 양성 (1)</td>
+<td>6,701</td>
+<td><strong>3.43%</strong></td>
+</tr>
+</tbody>
+</table>
+<h4 id="patient-level">환자 수준 (Patient-level)</h4>
+<table>
+<thead>
+<tr>
+<th>클래스</th>
+<th>환자 수</th>
+<th>비율</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>섬망 비경험 (Never)</td>
+<td>5,207</td>
+<td>68.12%</td>
+</tr>
+<tr>
+<td>섬망 경험 (Ever)</td>
+<td>2,437</td>
+<td><strong>31.88%</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="43">4.3 클래스 불균형 처리</h3>
+<p>심각한 클래스 불균형(양성률 3.43%)에 대응하기 위해:
+- sklearn: <code>class_weight='balanced'</code> 적용
+- XGBoost: <code>scale_pos_weight = neg_count / pos_count</code> 적용
+- PyTorch MLP: <code>BCEWithLogitsLoss</code> + <code>pos_weight</code> 적용</p>
+<p><strong>계산된 클래스 가중치:</strong>
+- Class 0 (음성): 0.5178
+- Class 1 (양성): 14.5829
+- 가중치 비율: <strong>28.2x</strong></p>
+<h3 id="44-37">4.4 최종 변수 목록 (37개)</h3>
+<table>
+<thead>
+<tr>
+<th>구분</th>
+<th>변수명</th>
+<th>개수</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>인구통계</td>
+<td>age, gender</td>
+<td>2</td>
+</tr>
+<tr>
+<td>활력징후 (mean)</td>
+<td>Heart Rate, Mean BP, Oxygen Saturation, Temperature</td>
+<td>4</td>
+</tr>
+<tr>
+<td>활력징후 (std)</td>
+<td>Heart Rate_std, Mean BP_std, Oxygen Saturation_std, Temperature_std</td>
+<td>4</td>
+</tr>
+<tr>
+<td>약물</td>
+<td>Propofol, Opiates, Benzodiazepines, Ketamine, Vasopressors</td>
+<td>5</td>
+</tr>
+<tr>
+<td>장비</td>
+<td>Ventilator</td>
+<td>1</td>
+</tr>
+<tr>
+<td>의식</td>
+<td>RASS</td>
+<td>1</td>
+</tr>
+<tr>
+<td>신체계측</td>
+<td>Weight</td>
+<td>1</td>
+</tr>
+<tr>
+<td>혈액</td>
+<td>WBC, Hemoglobin, Hematocrit, Platelets</td>
+<td>4</td>
+</tr>
+<tr>
+<td>전해질</td>
+<td>Sodium, Potassium, Chloride, Bicarbonate, Calcium, Magnesium, Phosphate</td>
+<td>7</td>
+</tr>
+<tr>
+<td>신장/간</td>
+<td>BUN, Creatinine, ALT</td>
+<td>3</td>
+</tr>
+<tr>
+<td>기타 검사</td>
+<td>Glucose, Lactate, pH, pCO2, pO2</td>
+<td>5</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5">5. 모델링</h2>
+<h3 id="51">5.1 데이터 분할</h3>
+<table>
+<thead>
+<tr>
+<th>세트</th>
+<th>샘플 수</th>
+<th>양성 수</th>
+<th>양성률</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Train</strong></td>
+<td><strong>156,352</strong></td>
+<td>5,361</td>
+<td>3.43%</td>
+</tr>
+<tr>
+<td><strong>Test</strong></td>
+<td><strong>39,088</strong></td>
+<td>1,340</td>
+<td>3.43%</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Stratified split (층화 추출)으로 클래스 비율 유지</li>
+<li>test_size = 0.2</li>
+<li>random_state = 42</li>
+</ul>
+<h3 id="52">5.2 전처리 파이프라인</h3>
+<ol>
+<li><strong>이상치 처리</strong>: IQR 기반 clipping (연속형 변수)</li>
+<li><strong>결측치 처리</strong>: Train set 기준 median imputation</li>
+</ol>
+<h3 id="53">5.3 모델 구성</h3>
+<table>
+<thead>
+<tr>
+<th>모델</th>
+<th>라이브러리</th>
+<th>특이사항</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Logistic Regression (LR)</strong></td>
+<td>sklearn</td>
+<td>solver=liblinear, class_weight=balanced, StandardScaler</td>
+</tr>
+<tr>
+<td><strong>Random Forest (RF)</strong></td>
+<td>sklearn</td>
+<td>max_features=8, class_weight=balanced</td>
+</tr>
+<tr>
+<td><strong>XGBoost (XGB)</strong></td>
+<td>xgboost</td>
+<td>n_estimators=300, scale_pos_weight</td>
+</tr>
+<tr>
+<td><strong>MLP</strong></td>
+<td>PyTorch</td>
+<td>3-layer, BCEWithLogitsLoss + pos_weight</td>
+</tr>
+</tbody>
+</table>
+<h3 id="54-optuna">5.4 Optuna 하이퍼파라미터 튜닝</h3>
+<p><strong>설정:</strong>
+- 최적화 목표: AUPRC 최대화
+- Trial 수: 8
+- Cross-validation: 5-Fold</p>
+<p><strong>탐색 범위 및 최적 파라미터:</strong></p>
+<table>
+<thead>
+<tr>
+<th>모델</th>
+<th>파라미터</th>
+<th>탐색 범위</th>
+<th>최적값</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LR</strong></td>
+<td>C</td>
+<td>0.01 ~ 100 (log)</td>
+<td>63.54</td>
+</tr>
+<tr>
+<td></td>
+<td>penalty</td>
+<td>l1, l2</td>
+<td>l1</td>
+</tr>
+<tr>
+<td><strong>RF</strong></td>
+<td>n_estimators</td>
+<td>100 ~ 500</td>
+<td>447</td>
+</tr>
+<tr>
+<td></td>
+<td>max_depth</td>
+<td>10 ~ 30</td>
+<td>25</td>
+</tr>
+<tr>
+<td></td>
+<td>min_samples_split</td>
+<td>2, 5, 10</td>
+<td>2</td>
+</tr>
+<tr>
+<td><strong>XGB</strong></td>
+<td>learning_rate</td>
+<td>0.01 ~ 0.2 (log)</td>
+<td>0.079</td>
+</tr>
+<tr>
+<td></td>
+<td>max_depth</td>
+<td>3 ~ 9</td>
+<td>8</td>
+</tr>
+<tr>
+<td></td>
+<td>subsample</td>
+<td>0.6 ~ 1.0</td>
+<td>0.773</td>
+</tr>
+<tr>
+<td><strong>MLP</strong></td>
+<td>hidden_dim</td>
+<td>128, 256, 512</td>
+<td>128</td>
+</tr>
+<tr>
+<td></td>
+<td>dropout</td>
+<td>0.1 ~ 0.5</td>
+<td>0.443</td>
+</tr>
+<tr>
+<td></td>
+<td>lr</td>
+<td>1e-4 ~ 1e-2 (log)</td>
+<td>0.00258</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Optuna 튜닝 결과 (AUPRC):</strong></p>
+<table>
+<thead>
+<tr>
+<th>모델</th>
+<th>Best AUPRC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>XGB</td>
+<td><strong>0.5072</strong></td>
+</tr>
+<tr>
+<td>RF</td>
+<td>0.4334</td>
+</tr>
+<tr>
+<td>MLP</td>
+<td>0.1703</td>
+</tr>
+<tr>
+<td>LR</td>
+<td>0.1064</td>
+</tr>
+</tbody>
+</table>
+<h3 id="55">5.5 교차 검증</h3>
+<p><strong>설정:</strong>
+- 5-Fold Stratified K-Fold
+- Best params 사용</p>
+<p><strong>Fold별 샘플 분포:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Fold</th>
+<th>Train 샘플</th>
+<th>양성 수</th>
+<th>Val 샘플</th>
+<th>양성 수</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>125,081</td>
+<td>4,289</td>
+<td>31,271</td>
+<td>1,072</td>
+</tr>
+<tr>
+<td>2</td>
+<td>125,081</td>
+<td>4,288</td>
+<td>31,271</td>
+<td>1,073</td>
+</tr>
+<tr>
+<td>3</td>
+<td>125,082</td>
+<td>4,289</td>
+<td>31,270</td>
+<td>1,072</td>
+</tr>
+<tr>
+<td>4</td>
+<td>125,082</td>
+<td>4,289</td>
+<td>31,270</td>
+<td>1,072</td>
+</tr>
+<tr>
+<td>5</td>
+<td>125,082</td>
+<td>4,289</td>
+<td>31,270</td>
+<td>1,072</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6">6. 결과</h2>
+<h3 id="61-5-fold-best-params">6.1 교차 검증 결과 (5-Fold, Best Params)</h3>
+<table>
+<thead>
+<tr>
+<th>모델</th>
+<th>AUC-ROC (95% CI)</th>
+<th>AUPRC (95% CI)</th>
+<th>PPV</th>
+<th>NPV</th>
+<th>MCC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>XGB</strong></td>
+<td><strong>0.9602 (0.9582-0.9622)</strong></td>
+<td><strong>0.5072 (0.4888-0.5256)</strong></td>
+<td>0.4058</td>
+<td>0.9906</td>
+<td>0.5283</td>
+</tr>
+<tr>
+<td>RF</td>
+<td>0.9548 (0.9507-0.9588)</td>
+<td>0.4334 (0.4042-0.4626)</td>
+<td>0.3597</td>
+<td>0.9921</td>
+<td>0.5093</td>
+</tr>
+<tr>
+<td>MLP</td>
+<td>0.8631 (0.8607-0.8655)</td>
+<td>0.1769 (0.1670-0.1868)</td>
+<td>0.0987</td>
+<td>0.9936</td>
+<td>0.2330</td>
+</tr>
+<tr>
+<td>LR</td>
+<td>0.8052 (0.8017-0.8088)</td>
+<td>0.1064 (0.1026-0.1103)</td>
+<td>0.0752</td>
+<td>0.9918</td>
+<td>0.1794</td>
+</tr>
+</tbody>
+</table>
+<h3 id="62-test-set-optuna-best-params">6.2 Test Set 최종 결과 (Optuna Best Params)</h3>
+<table>
+<thead>
+<tr>
+<th>모델</th>
+<th>AUC-ROC</th>
+<th>AUPRC</th>
+<th>PPV</th>
+<th>NPV</th>
+<th>MCC</th>
+<th>Spec@90</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>XGB</strong></td>
+<td><strong>0.9593</strong></td>
+<td><strong>0.5045</strong></td>
+<td>0.3960</td>
+<td>0.9913</td>
+<td>0.5285</td>
+<td><strong>0.9317</strong></td>
+</tr>
+<tr>
+<td>RF</td>
+<td>0.9538</td>
+<td>0.4294</td>
+<td>0.3571</td>
+<td>0.9922</td>
+<td>0.5086</td>
+<td>0.9305</td>
+</tr>
+<tr>
+<td>MLP</td>
+<td>0.8632</td>
+<td>0.1801</td>
+<td>0.1015</td>
+<td>0.9929</td>
+<td>0.2349</td>
+<td>0.6832</td>
+</tr>
+<tr>
+<td>LR</td>
+<td>0.8072</td>
+<td>0.1102</td>
+<td>0.0748</td>
+<td>0.9915</td>
+<td>0.1774</td>
+<td>0.5378</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Spec@90</strong>: 90% Sensitivity에서의 Specificity</p>
+</blockquote>
+<h3 id="63-quick-cv-default-params">6.3 Quick CV 결과 (Default Params, 비교용)</h3>
+<table>
+<thead>
+<tr>
+<th>모델</th>
+<th>AUC-ROC (95% CI)</th>
+<th>AUPRC (95% CI)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>XGB</td>
+<td>0.9592 (0.9569-0.9615)</td>
+<td>0.4794 (0.4590-0.4998)</td>
+</tr>
+<tr>
+<td>RF</td>
+<td>0.9531 (0.9493-0.9569)</td>
+<td>0.4180 (0.3866-0.4494)</td>
+</tr>
+<tr>
+<td>LR</td>
+<td>0.8049 (0.8013-0.8085)</td>
+<td>0.1063 (0.1025-0.1101)</td>
+</tr>
+</tbody>
+</table>
+<p>→ Optuna 튜닝으로 XGB AUPRC <strong>5.2%p 향상</strong> (0.4794 → 0.5045)</p>
+<h3 id="64">6.4 성능 해석</h3>
+<h4 id="baseline">Baseline 대비 성능</h4>
+<ul>
+<li>단순 양성률 기반 baseline AUPRC: <strong>0.0343</strong> (3.43%)</li>
+<li>XGB AUPRC: <strong>0.5045</strong> → baseline 대비 <strong>14.7배</strong> 향상</li>
+</ul>
+<h4 id="_2">클래스 불균형 하에서의 해석</h4>
+<ul>
+<li><strong>높은 NPV (&gt;99%)</strong>: 음성 예측의 높은 신뢰도 (실제 음성을 잘 맞춤)</li>
+<li><strong>중간 PPV (~40%)</strong>: 양성 예측 시 약 40%가 실제 양성</li>
+<li><strong>높은 Spec@90 (93%)</strong>: 90% sensitivity 유지하면서 93% specificity 달성</li>
+</ul>
+<hr />
+<h2 id="7">7. 결론 및 논의</h2>
+<h3 id="71">7.1 주요 발견</h3>
+<ol>
+<li><strong>XGBoost가 최고 성능</strong> 달성</li>
+<li>AUC-ROC 0.96, AUPRC 0.50으로 섬망 예측에 효과적</li>
+<li>
+<p>3.43%의 극심한 클래스 불균형에서도 우수한 성능</p>
+</li>
+<li>
+<p><strong>Tree 기반 모델의 우수성</strong></p>
+</li>
+<li>RF, XGB가 LR, MLP보다 현저히 높은 성능</li>
+<li>
+<p>비선형 관계 및 변수 간 상호작용 포착에 유리</p>
+</li>
+<li>
+<p><strong>딥러닝(MLP)의 제한적 성능</strong></p>
+</li>
+<li>표 형식 데이터에서 MLP는 tree 기반 모델 대비 열위</li>
+<li>충분한 데이터에도 불구하고 AUPRC 0.18로 제한적</li>
+</ol>
+<h3 id="72">7.2 임상적 의의</h3>
+<ul>
+<li><strong>스크리닝 도구로서의 활용</strong>: 높은 NPV로 음성 예측 신뢰 가능</li>
+<li><strong>고위험군 식별</strong>: PPV 40%로 양성 예측 환자 집중 관리 가능</li>
+<li><strong>8시간 윈도우 기반 예측</strong>: 실시간 모니터링 시스템 적용 가능</li>
+</ul>
+<h3 id="73">7.3 한계점</h3>
+<ol>
+<li><strong>단일 기관 데이터</strong>: MIMIC-IV (Beth Israel Deaconess Medical Center)로 일반화 제한</li>
+<li><strong>후향적 연구</strong>: 전향적 검증 필요</li>
+<li><strong>CAM-ICU 의존</strong>: 평가 누락 시점 예측 불가</li>
+<li><strong>시간 의존성 미고려</strong>: 순차적 패턴 미반영 (LSTM 등 미적용)</li>
+</ol>
+<h3 id="74">7.4 향후 연구 방향</h3>
+<ul>
+<li>외부 검증 (eICU, 국내 데이터)</li>
+<li>시계열 모델 적용 (LSTM, Transformer)</li>
+<li>설명 가능성 분석 (SHAP, Feature Importance)</li>
+<li>전향적 임상 검증</li>
+</ul>
+<hr />
+<h2 id="_3">부록</h2>
+<h3 id="a">A. 파일 구조</h3>
+<pre><code>YonseiAIChallenge/
+├── src/
+│   ├── 1_mimiciv_extraction.sql    # 데이터 추출 SQL
+│   ├── 2_Data_transform.ipynb      # 데이터 전처리
+│   └── 3_Models.ipynb              # 모델링
+├── Data/
+│   ├── all_events.csv              # 원본 이벤트 (38.3M rows)
+│   ├── adm_pat_icu.csv             # ICU 체류 정보 (72.7K stays)
+│   ├── all_timeseries.csv          # 시계열 (2.9M rows)
+│   ├── timeseries_imputed.csv      # Imputation 완료
+│   └── final_dataset.csv           # 최종 (195.4K rows)
+├── models/
+│   ├── optuna/                     # Optuna 튜닝 모델
+│   └── quick/                      # Default 모델
+└── docs/
+    ├── 1-Data_extraction_MIMIC_workflow.md
+    ├── 2-Data_transform_workflow.md
+    └── 3-Models_workflow.md
+</code></pre>
+<h3 id="b">B. 주요 설정값</h3>
+<pre><code class="language-python">SEED_VALUE = 42
+N_SPLITS = 5              # K-Fold CV
+N_TRIALS = 8              # Optuna trials
+N_JOBS = 4                # Parallel jobs
+TEST_SIZE = 0.2           # Train/Test split
+DATA_DIR = '../Data'
+OPTUNA_SAVE_DIR = '../models/optuna'
+</code></pre>
+<h3 id="c">C. 데이터 흐름 요약</h3>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>파일</th>
+<th>행 수</th>
+<th>ICU stay 수</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>원본 추출</td>
+<td>all_events.csv</td>
+<td>38,276,100</td>
+<td>72,729</td>
+</tr>
+<tr>
+<td>LOS 필터링</td>
+<td>-</td>
+<td>17,400,216</td>
+<td>7,661</td>
+</tr>
+<tr>
+<td>시계열 피봇</td>
+<td>all_timeseries.csv</td>
+<td>2,868,290</td>
+<td>7,661</td>
+</tr>
+<tr>
+<td>Imputation</td>
+<td>timeseries_imputed.csv</td>
+<td>2,868,290</td>
+<td>7,661</td>
+</tr>
+<tr>
+<td>8h 윈도우 집계</td>
+<td><strong>final_dataset.csv</strong></td>
+<td><strong>195,440</strong></td>
+<td><strong>7,644</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>Generated with Claude Code</em></p>
+</body>
+</html>

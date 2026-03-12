@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(tree:*)",
+      "Bash(where:*)",
+      "Bash(pandoc:*)",
+      "Bash(pip show:*)",
+      "Bash(pip install:*)",
+      "Bash(mdpdf:*)",
+      "Bash(dir:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}

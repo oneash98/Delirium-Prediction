@@ -1,11 +1,12 @@
 mostafaalishahi/Delirium_prediction_models/Data/admission_units
 mostafaalishahi/Delirium_prediction_models/Data/mimic-iii-clinical-database-1.4
-mostafaalishahi/Delirium_prediction_models/Data/preprocessed/all_data_delirium_mimic.csv
+mostafaalishahi/Delirium_predictionsssssssssssss_models/Data/preprocessed/all_data_delirium_mimic.csv
 mostafaalishahi/Delirium_prediction_models/Data/preprocessed/chartevent.csv
 mostafaalishahi/Delirium_prediction_models/Data/preprocessed/icu_lab.csv
 mostafaalishahi/Delirium_prediction_models/Data/preprocessed/mimic_pivoted_sofa.csv
 mostafaalishahi/Delirium_prediction_models/Data/preprocessed/mimic_wes.csv
-
+YonseiAIChallenge/Data/
+YonseiAIChallenge/models/optuna/
 
 .Ds_Store
 
