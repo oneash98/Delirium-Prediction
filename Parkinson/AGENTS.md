@@ -8,12 +8,12 @@ MIMIC-IV 기반 Parkinson 코호트에서 ICU 섬망 평가를 outcome으로 사
 
 1. 원천 CSV에서 ICU stay 코호트와 임상 이벤트를 추출합니다.
 2. 추출된 long-format 이벤트를 1시간 단위 timeseries로 변환합니다.
-3. 섬망 평가 시점마다 직전 8시간 window를 집계해 모델링용 assessment-level 데이터셋을 만듭니다.
+3. 섬망 평가 시점마다 observation window 후보를 모델링 단계에서 집계해 assessment-level 데이터셋을 만듭니다.
 
 ## 주요 경로
 
 - `src/1_data_extraction.ipynb`: 원천 MIMIC-IV CSV에서 cohort, chart, lab, medication, procedure 이벤트를 추출합니다.
-- `src/2_data_transform.ipynb`: 추출 결과를 숫자화, 단위 통일, 시간 binning, 결측 처리, 8시간 window 집계로 변환합니다.
+- `src/2_data_transform.ipynb`: 추출 결과를 숫자화, 단위 통일, 1시간 binning, EDA, subject-level split 산출물로 변환합니다.
 - `src/extraction_variable_catalog.md`: 추출 대상 변수 catalog 문서입니다.
 - `src/extraction_variable_catalog.csv`: 추출 대상 변수 catalog의 CSV 버전입니다.
 - `data/`: 원천 CSV 파일 위치입니다. 민감 데이터는 git에 올리지 않습니다.
@@ -43,18 +43,16 @@ Parkinson/data/*.csv
        lab_selected.csv
        medication_events.csv
        procedure_selected.csv
-       all_events.csv
+       all_events_long.csv
   -> src/2_data_transform.ipynb
   -> processed/transform/
        cohort_attrition.csv
-       adm_pat_icu_8hrs.csv
-       all_events_8hrs.csv
        all_events_filtered.csv
        all_timeseries.csv
-       timeseries_imputed.csv
-       final_dataset.csv
-       assessment_dataset_60min.csv
        hourly_timeseries_60min.csv
+       assessment_index_60min.csv
+       train_subject_ids.csv
+       test_subject_ids.csv
 ```
 
 ## 코호트 기준
@@ -85,23 +83,21 @@ Parkinson/data/*.csv
 - 같은 stay-bin에 여러 이벤트가 있으면 pivot 단계에서 `max`를 사용합니다.
 - 단위는 공통 단위로 맞춥니다. 예: Fahrenheit to Celsius, pounds to kg, FiO2 0-1 to percent.
 - 변환 rule 적용 후에도 같은 `source_table` + `feature_name` 안에 `valueuom`이 2개 이상이면 unit별 feature로 분리합니다.
-- 약물/처치/장치 feature는 binary exposure flag로 만듭니다.
-- 약물은 eMAR 투약 시점과 8시간 lookback을 반영합니다.
+- 약물 feature는 extraction 단계에서 `all_events_long.csv`에 point event로 포함하며, 실제 투약 hour만 `1`로 둡니다.
 - 처치/장치는 이벤트 구간과 현재 hour bin이 겹치면 노출로 표시합니다.
-- 체중/키는 stay 내 forward-fill과 backward-fill을 적용합니다.
-- 활력징후는 최대 4시간까지만 forward-fill합니다.
-- Lab은 시간별 보간하지 않고 최종 8시간 window에서 최신값을 사용합니다.
+- 체중/키는 stay 내 첫 측정값을 전체 hourly bin에 적용합니다.
+- 활력징후, Lab, neuro 변수는 transform 단계에서 시간별 보간하지 않습니다.
 
 ## 최종 데이터셋 단위
 
-`final_dataset.csv`와 `assessment_dataset_60min.csv`는 섬망 평가 1건을 1행으로 하는 assessment-level 데이터셋입니다.
+`assessment_index_60min.csv`는 섬망 평가 1건을 1행으로 하는 assessment index입니다.
 
-- group key: `stay_id`, `assessment_bin`, `Delirium`
-- window: 평가 시점 포함 직전 8개 hourly bins
-- demographics: window 내 첫 값
-- vitals: 8시간 평균과 표준편차
-- medication/procedure/device: window 내 노출 여부 max
-- lab/body/neuro: window 내 최신 관측값
+- key: `subject_id`, `stay_id`, `assessment_bin`
+- outcome: `delirium`
+- subject-level label: `ever_delirium`
+- split: subject-level random train/test split
+
+Observation window별 feature 생성, 약물/procedure window-level exposure, train 기준 imputation은 모델링 단계에서 수행합니다.
 
 ## 작업 시 주의사항
 
@@ -110,6 +106,7 @@ Parkinson/data/*.csv
 - 기존 코드, 노트북 셀 구조, 문서 내용은 요청 범위에 필요한 부분만 최소 변경합니다.
 - 원천 MIMIC-IV 데이터와 산출 CSV는 민감 정보가 될 수 있으므로 git에 포함하지 않습니다.
 - 기존 notebook의 실행 순서 의존성이 강합니다. 셀을 재배치할 때는 중간 저장 파일과 변수명을 함께 확인합니다.
-- extraction 단계의 `adm_pat_icu.csv`와 `adm_pat_icu_all.csv`는 전체 ICU stay 기준입니다. 최종 8시간 이상 코호트 파일은 transform 단계의 `adm_pat_icu_8hrs.csv`입니다.
+- 앞선 notebook 셀에서 생성되어야 하는 변수나 컬럼은 뒤 셀에서 존재한다고 가정하고 그대로 사용합니다. 예: `if 'delirium_assessment' in timeseries.columns:`처럼 기대 컬럼 부재를 대비하는 방어 코드는 사용하지 않습니다.
+- extraction 단계의 `adm_pat_icu.csv`는 전체 ICU stay 기준입니다. 최종 cohort와 train/test split은 transform 단계 산출물에 반영합니다.
 - notebook JSON을 수정할 때는 저장 후 `json.load`로 파일이 깨지지 않았는지 확인합니다.
 - 코드를 바꾼 뒤에는 가능하면 작은 샘플 또는 dry-run으로 산출물 컬럼이 유지되는지 확인합니다.

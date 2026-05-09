@@ -1,7 +1,7 @@
 source_table,itemid,category,label,feature_name,type,unit_or_window,transform_note
 patients,,,anchor_age,age,numeric,,
 patients,,,gender,gender,binary,,
-chartevents,228332,,Delirium assessment,delirium_assessment,binary,Positive/Negative/UTA,"Positive=1, Negative=0, UTA/other=NaN; primary outcome label"
+chartevents,228332,,Delirium assessment,delirium,binary,Positive/Negative/UTA,"Positive=1, Negative=0, UTA/other=NaN; primary outcome label"
 chartevents,228096,,Richmond-RAS Scale,rass,ordinal,-5 to +4,value (text) -> integer
 chartevents,220739,,GCS - Eye Opening,gcs_eye,ordinal,1 to 4,use valuenum
 chartevents,223900,,GCS - Verbal Response,gcs_verbal,ordinal,1 to 5,use valuenum
