@@ -1,0 +1,208 @@
+source_table,itemid,category,label,feature_name,type,unit_or_window,transform_note
+patients,,,anchor_age,age,numeric,,
+patients,,,gender,gender,binary,,
+chartevents,228332,,Delirium assessment,delirium_assessment,binary,Positive/Negative/UTA,"Positive=1, Negative=0, UTA/other=NaN; primary outcome label"
+chartevents,228096,,Richmond-RAS Scale,rass,ordinal,-5 to +4,value (text) -> integer
+chartevents,220739,,GCS - Eye Opening,gcs_eye,ordinal,1 to 4,use valuenum
+chartevents,223900,,GCS - Verbal Response,gcs_verbal,ordinal,1 to 5,use valuenum
+chartevents,223901,,GCS - Motor Response,gcs_motor,ordinal,1 to 6,use valuenum
+chartevents,220045,,Heart Rate,heart_rate,numeric,bpm,
+chartevents,220210,,Respiratory Rate,respiratory_rate,numeric,insp/min,
+chartevents,220277,,O2 saturation pulseoxymetry,spo2,numeric,%,
+chartevents,220227,,Arterial O2 Saturation,sao2,numeric,%,
+chartevents,220179,,Non Invasive Blood Pressure systolic,nibp_sbp,numeric,mmHg,
+chartevents,220180,,Non Invasive Blood Pressure diastolic,nibp_dbp,numeric,mmHg,
+chartevents,220181,,Non Invasive Blood Pressure mean,nibp_mbp,numeric,mmHg,
+chartevents,220050,,Arterial Blood Pressure systolic,abp_sbp,numeric,mmHg,
+chartevents,225309,,ART BP Systolic,abp_sbp,numeric,mmHg,
+chartevents,220051,,Arterial Blood Pressure diastolic,abp_dbp,numeric,mmHg,
+chartevents,225310,,ART BP Diastolic,abp_dbp,numeric,mmHg,
+chartevents,220052,,Arterial Blood Pressure mean,abp_mbp,numeric,mmHg,
+chartevents,223761,,Temperature Fahrenheit,temperature,numeric,degF,convert Fahrenheit to Celsius
+chartevents,223762,,Temperature Celsius,temperature,numeric,degC,
+chartevents,226512,,Admission Weight (Kg),weight,numeric,kg,
+chartevents,226531,,Admission Weight (lbs.),weight,numeric,lbs,convert lb to kg
+chartevents,226730,,Height (cm),height,numeric,cm,
+chartevents,226707,,Height,height,numeric,Inch,convert inches to cm
+chartevents,220621,,Glucose (serum),glucose,numeric,mg/dL,
+chartevents,225664,,Glucose finger stick (range 70-100),glucose,numeric,mg/dL,
+chartevents,226537,,Glucose (whole blood),glucose,numeric,mg/dL,
+labevents,50931,blood chemistry,Glucose,glucose,numeric,mg/dL,
+labevents,52569,blood chemistry,Glucose,glucose,numeric,mg/dL,
+labevents,50882,blood chemistry,Bicarbonate,bicarbonate,numeric,mEq/L,
+labevents,50803,blood gas,"Calculated Bicarbonate, Whole Blood",bicarbonate_gas,numeric,mEq/L,
+labevents,50893,blood chemistry,"Calcium, Total",calcium_free,numeric,mg/dL,
+labevents,50902,blood chemistry,Chloride,chloride,numeric,mEq/L,
+labevents,52535,blood chemistry,Chloride,chloride,numeric,mEq/L,
+labevents,50983,blood chemistry,Sodium,sodium,numeric,mEq/L,
+labevents,52623,blood chemistry,Sodium,sodium,numeric,mEq/L,
+labevents,50971,blood chemistry,Potassium,potassium,numeric,mEq/L,
+labevents,52610,blood chemistry,Potassium,potassium,numeric,mEq/L,
+labevents,51006,blood chemistry,Urea Nitrogen,BUN,numeric,mg/dL,
+labevents,52647,blood chemistry,Urea Nitrogen,BUN,numeric,mg/dL,
+labevents,50912,blood chemistry,Creatinine,creatinine,numeric,mg/dL,
+labevents,52546,blood chemistry,Creatinine,creatinine,numeric,mg/dL,
+labevents,50960,blood chemistry,Magnesium,magnesium,numeric,mg/dL,
+labevents,50970,blood chemistry,Phosphate,phosphate,numeric,mg/dL,
+labevents,50862,blood chemistry,Albumin,albumin,numeric,g/dL,
+labevents,50813,blood chemistry,Lactate,lactate,numeric,mmol/L,
+labevents,50861,blood chemistry,Alanine Aminotransferase (ALT),alt,numeric,IU/L,
+labevents,50878,blood chemistry,Asparate Aminotransferase (AST),ast,numeric,IU/L,
+labevents,50885,blood chemistry,"Bilirubin, Total",bilirubin_total,numeric,mg/dL,
+labevents,50883,blood chemistry,"Bilirubin, Direct",bilirubin_direct,numeric,mg/dL,
+labevents,50884,blood chemistry,"Bilirubin, Indirect",bilirubin_indirect,numeric,mg/dL,
+labevents,50810,blood gas,"Hematocrit, Calculated",hematocrit,numeric,%,
+labevents,51221,blood hematology,Hematocrit,hematocrit,numeric,%,
+labevents,51638,blood chemistry,Hematocrit,hematocrit,numeric,%,
+labevents,50811,blood gas,Hemoglobin,hemoglobin,numeric,g/dL,
+labevents,51222,blood hematology,Hemoglobin,hemoglobin,numeric,g/dL,
+labevents,51645,blood chemistry,"Hemoglobin, Calculated",hemoglobin,numeric,g/dL,
+labevents,51265,blood hematology,Platelet Count,platelet_count,numeric,K/uL,
+labevents,51300,blood hematology,WBC Count,wbc,numeric,K/uL,
+labevents,51301,blood hematology,White Blood Cells,wbc,numeric,K/uL,
+labevents,51755,blood chemistry,White Blood Cells,wbc,numeric,K/uL,
+labevents,50820,blood gas,pH,ph,numeric,units,
+labevents,50818,blood gas,pCO2,pco2,numeric,mm Hg,
+labevents,50821,blood gas,pO2,po2,numeric,mm Hg,
+labevents,51237,blood hematology,INR(PT),inr_pt,numeric,,
+labevents,51274,blood hematology,PT,pt,numeric,sec,
+labevents,51275,blood hematology,PTT,ptt,numeric,sec,
+procedureevents,225792,,Invasive Ventilation,procedure_invasive_ventilation,binary,,positive(1)  if procedure interval (starttime-endtime)  overlaps the observation window
+procedureevents,225794,,Non-invasive Ventilation,procedure_noninvasive_ventilation,binary,,positive(1)  if procedure interval (starttime-endtime)  overlaps the observation window
+emar,,,*NF* Carbidopa-Levodopa (25-100),levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Carbidopa-Levodopa (10-100),levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Carbidopa-Levodopa (25-100),levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Carbidopa-Levodopa (25-100) ODT,levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Carbidopa-Levodopa (25-250),levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Carbidopa-Levodopa (25-250) ODT,levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Carbidopa-Levodopa CR (25-100),levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Carbidopa-Levodopa CR (50-200),levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Duopa,levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Levodopa-Benserazide (50 mg/12.5 mg),levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Rytary,levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Sinemet,levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Stalevo 100,levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Stalevo 150,levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Stalevo 200,levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Stalevo 50,levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Stalevo 75,levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,carbidopa,levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,carbidopa (bulk),levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,carbidopa-levodopa,levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,carbidopa-levodopa-entacapone,levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,levodopa,levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,levodopa (bulk),levodopa_related,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,ENTAcapone,comt_inhibitor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Entacapone,comt_inhibitor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Stalevo 100,comt_inhibitor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Stalevo 150,comt_inhibitor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Stalevo 200,comt_inhibitor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Stalevo 50,comt_inhibitor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Stalevo 75,comt_inhibitor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,carbidopa-levodopa-entacapone,comt_inhibitor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,entacapone,comt_inhibitor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,tolcapone,comt_inhibitor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Bromocriptine Mesylate,dopamine_agonist,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Mirapex,dopamine_agonist,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Mirapex ER,dopamine_agonist,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Neupro,dopamine_agonist,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Pramipexole,dopamine_agonist,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Requip XL,dopamine_agonist,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Ropinirole,dopamine_agonist,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,pramipexole,dopamine_agonist,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,rOPINIRole,dopamine_agonist,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,rotigotine,dopamine_agonist,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Azilect,maob_inhibitor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Rasagiline,maob_inhibitor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Selegiline HCl,maob_inhibitor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Zelapar,maob_inhibitor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,rasagiline,maob_inhibitor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Amantadine,amantadine,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Amantadine Syrup,amantadine,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Gocovri,amantadine,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,amantadine HCl,amantadine,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Benztropine Mesylate,anticholinergic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Trihexyphenidyl,anticholinergic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,ALPRAZolam,benzodiazepine,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,ChlordiazePOXIDE,benzodiazepine,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Clobazam,benzodiazepine,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,ClonazePAM,benzodiazepine,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Diazepam,benzodiazepine,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Diazepam - CIWA protocol,benzodiazepine,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,LORazepam,benzodiazepine,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Lorazepam,benzodiazepine,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Midazolam,benzodiazepine,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Oxazepam,benzodiazepine,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Temazepam,benzodiazepine,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,diazePAM,benzodiazepine,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Acetaminophen w/Codeine,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Acetaminophen w/Codeine Elixir,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Belladonna & Opium (16.2/30mg),opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Bupivacaine 0.1%|HYDROmorphone (Dilaudid),opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Bupivacaine 0.1%|Hydromorphone,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Buprenorphine-Naloxone (8mg-2mg),opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Buprenorphine-Naloxone Tablet (8mg-2mg),opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Codeine Sulfate,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Fentanyl Citrate,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Fentanyl Infusion – Comfort Care Guidelines,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Fentanyl Patch,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,GuaiFENesin-CODEINE Phosphate,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Guaifenesin-CODEINE Phosphate,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,HYDROcodone-Acetaminophen (5mg-325mg),opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,HYDROmorphone (Dilaudid),opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,HYDROmorphone Infusion – Comfort Care Guidelines,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Hydrocodone-Acetaminophen (5mg-325mg),opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Hydromorphone (Oral Solution) 1 mg/1 mL,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Meperidine,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Methadone,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Morphine Infusion – Comfort Care Guidelines,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Morphine SR (MS Contin),opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Morphine Sulfate,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Morphine Sulfate (Concentrated Oral Solution) 20 mg/mL,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Morphine Sulfate (Oral Solution) 2 mg/mL,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Morphine Sulfate IR,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,OxyCODONE (Immediate Release),opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,OxyCODONE Liquid,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,OxyCODONE SR (OxyCONTIN),opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,OxyCODONE SR (OxyconTIN),opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,OxyCODONE--Acetaminophen (5mg-325mg),opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,OxycoDONE (Concentrated Oral Soln),opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,OxycoDONE (Immediate Release),opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,OxycoDONE Liquid,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Oxycodone-Acetaminophen,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Oxycodone-Acetaminophen (5mg-325mg),opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,TraMADOL (Ultram),opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,TraMADol,opioid,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Dexmedetomidine,sedatives,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Etomidate,sedatives,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Ketamine,sedatives,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Propofol,sedatives,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,ARIPiprazole,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Aripiprazole,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,ChlorproMAZINE,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Clozapine,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Fluphenazine,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Haloperidol,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,OLANZapine,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,OLANZapine (Disintegrating Tablet),antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,PALIperidone ER,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,PALIperidone Palmitate,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Perphenazine,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,QUEtiapine Fumarate,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,QUEtiapine extended-release,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,RISperidone,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,RisperiDONE,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,RisperiDONE (Disintegrating Tablet),antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,RisperiDONE Long Acting Injection,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,ZIPRASidone Hydrochloride,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,ZIPRASidone Mesylate,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,fluPHENAZine HCl,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,lurasidone,antipsychotic,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Vasopressin,vasopressor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,DOBUTamine,vasopressor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,PHENYLephrine,vasopressor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,PHENYLEPHrine,vasopressor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Phenylephrine 2.5 % Ophth Soln,vasopressor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,PHENYLEPHrinePhenylephrine 10 % Ophth Soln,vasopressor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,NORepinephrine,vasopressor,binary,,positive(1)  if  the observation window overlaps the charttime
+emar,,,Norepinephrine,vasopressor,binary,,positive(1)  if  the observation window overlaps the charttime

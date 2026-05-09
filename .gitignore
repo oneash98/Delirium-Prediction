@@ -7,8 +7,12 @@ mostafaalishahi/Delirium_prediction_models/Data/preprocessed/mimic_pivoted_sofa.
 mostafaalishahi/Delirium_prediction_models/Data/preprocessed/mimic_wes.csv
 YonseiAIChallenge/Data/
 YonseiAIChallenge/models/optuna/
-
+data/
+Parkinson/processed/extraction/
+Parkinson/processed/transform/
 .Ds_Store
+.obsidian
+test*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
