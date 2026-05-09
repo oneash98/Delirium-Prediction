@@ -22,6 +22,7 @@ chartevents,223761,,Temperature Fahrenheit,temperature,numeric,degF,convert Fahr
 chartevents,223762,,Temperature Celsius,temperature,numeric,degC,
 chartevents,226512,,Admission Weight (Kg),weight,numeric,kg,
 chartevents,226531,,Admission Weight (lbs.),weight,numeric,lbs,convert lb to kg
+chartevents,224639,,Daily Weight,weight,numeric,kg,
 chartevents,226730,,Height (cm),height,numeric,cm,
 chartevents,226707,,Height,height,numeric,Inch,convert inches to cm
 chartevents,220621,,Glucose (serum),glucose,numeric,mg/dL,

@@ -1,22 +1,38 @@
-# 3_modeling 계획
+# 4_modeling 계획
 
-이 문서는 `2_data_transform.ipynb` 이후 모델링 단계에서 수행할 작업 계획입니다.
+이 문서는 `4_modeling.ipynb`에서 수행할 모델링 단계 작업 계획입니다. `3_eda.ipynb`는 별도 EDA 노트북입니다.
 
-Transform 단계는 hourly timeseries와 assessment index, subject-level split까지만 만듭니다. 모델링 단계에서는 train/test split을 유지한 상태에서 observation window feature를 만들고, train 기준으로 feature selection과 imputation을 수행합니다.
+Transform 단계는 hourly timeseries와 assessment index까지만 만듭니다. 모델링 단계에서는 subject-level train/test split을 생성한 뒤 observation window feature를 만들고, train 기준으로 feature selection과 imputation을 수행합니다.
 
 ## 입력 파일
 
 `processed/transform/`:
 
-- `hourly_timeseries_60min.csv`: cohort criteria를 통과한 hourly timeseries. `ever_delirium`, `split` 포함.
-- `assessment_index_60min.csv`: assessment-level index. `subject_id`, `stay_id`, `assessment_bin`, `delirium`, `ever_delirium`, `split` 포함.
-- `train_subject_ids.csv`, `test_subject_ids.csv`: subject-level split 고정용 파일.
+- `hourly_timeseries_60min.csv`: cohort criteria를 통과한 hourly timeseries. `ever_delirium` 포함.
+- `assessment_index_60min.csv`: assessment-level index. `subject_id`, `stay_id`, `assessment_bin`, `delirium`, `ever_delirium` 포함.
+- `cohort_final.csv`: cohort criteria를 통과한 stay-level cohort table.
 
-## 핵심 원칙
+`split` 컬럼과 `train_subject_ids.csv`, `test_subject_ids.csv`는 이 노트북의 `## 환자 단위 무작위 train/test 분할`, `## Split 산출물 저장` 이후 생성됩니다.
+
+## 환자 단위 무작위 train/test 분할
+
+현재 `4_modeling.ipynb`에 구현된 첫 번째 섹션입니다. Subject 단위로 80/20 random split을 수행하고, 같은 subject의 모든 stay와 assessment가 같은 split에 속하는지 확인합니다.
+
+- `ever_delirium`은 EDA와 split 확인용 subject-level label이며, 기본 모델 target으로 쓰지 않습니다.
+- Train/test split은 `4_modeling.ipynb`에서 subject-level로 생성하고 이후 모델링 단계에서 그대로 사용합니다.
+
+## Split 산출물 저장
+
+현재 `4_modeling.ipynb`에 구현된 두 번째 섹션입니다.
+
+- `hourly_timeseries_60min.csv`에 `split` 컬럼을 저장합니다.
+- `assessment_index_60min.csv`에 `split` 컬럼을 저장합니다.
+- `cohort_final.csv`에 `split` 컬럼을 저장합니다.
+- `train_subject_ids.csv`, `test_subject_ids.csv`를 저장합니다.
+
+## 모델링 핵심 원칙
 
 - Assessment-level outcome은 `delirium`입니다.
-- `ever_delirium`은 EDA와 split 확인용 subject-level label이며, 기본 모델 target으로 쓰지 않습니다.
-- Train/test split은 `2_data_transform.ipynb`에서 만든 subject-level split을 그대로 사용합니다.
 - Window 길이, feature 제외 기준, imputation 값은 train set에서만 결정합니다.
 - Test set은 train에서 정한 window, feature 목록, imputation 값을 그대로 적용받습니다.
 
