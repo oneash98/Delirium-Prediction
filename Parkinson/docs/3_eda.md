@@ -6,7 +6,9 @@
 
 `processed/transform/`:
 
-- `hourly_timeseries_60min.csv`: cohort criteria를 통과한 hourly timeseries.
+- `events_12h_wide_by_charttime.csv`: cohort criteria를 통과한 charttime 기준 wide table.
+- `events_12h_long.csv`: cohort criteria를 통과한 12시간 라벨 long-format event table.
+- `assessment_index_12h.csv`: 섬망 평가 시점 index.
 - `cohort_final.csv`: cohort criteria를 통과한 stay-level cohort table.
 - `cohort_attrition.csv`: inclusion/exclusion criteria별 attrition table.
 - `all_events_filtered.csv`: lab 측정 주기 확인에 사용하는 long-format event table.
@@ -36,7 +38,7 @@
 - stay/subject별 assessment count
 - stay 안에서 assessment 간격 median/IQR
 - ICU 입실 후 첫 assessment까지 걸린 시간
-- ICU hour/day당 assessment 빈도
+- ICU 12시간 bin/day당 assessment 빈도
 
 ## EDA: 검사실(lab) 측정 주기
 

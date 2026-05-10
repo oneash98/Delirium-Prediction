@@ -1,6 +1,6 @@
 # 2_data_transform.ipynb 설명
 
-`src/2_data_transform.ipynb`는 `1_data_extraction.ipynb`의 산출물을 1시간 단위 hourly timeseries로 정리하고 cohort 기준까지 적용합니다. EDA는 `src/3_eda.ipynb`, subject-level train/test split은 `src/4_modeling.ipynb`에서 수행합니다.
+`src/2_data_transform.ipynb`는 `1_data_extraction.ipynb`의 산출물을 숫자화, 단위 통일, ICU 입실 기준 12시간 구간 라벨링, charttime 기준 wide 변환, cohort 기준 적용 산출물로 변환합니다. EDA는 `src/3_eda.ipynb`, subject-level train/test split은 `src/4_modeling.ipynb`에서 수행합니다.
 
 문서 순서는 실제 노트북의 마크다운 소제목 순서를 따릅니다.
 
@@ -10,32 +10,34 @@
 
 - `all_events_long.csv`: chart, lab, eMAR medication point event가 통합된 long-format 이벤트.
 - `adm_pat_icu.csv`: ICU stay, admission, patient 기본 정보.
-- `procedure_selected.csv`: procedure/device 이벤트.
+- `procedure_selected.csv`: procedure/device interval 이벤트.
 
 주요 출력 파일은 `processed/transform/`에 저장됩니다.
 
 - `all_events_filtered.csv`: 값 숫자화와 단위 변환이 반영된 chart/lab/medication long-format 이벤트.
-- `all_events_timeseries.csv`: chart/lab/medication point event를 60분 bin으로 pivot한 원본 hourly timeseries.
-- `all_timeseries.csv`: procedure/device exposure와 weight/height static fill까지 반영한 전체 hourly timeseries.
-- `hourly_timeseries_60min.csv`: cohort criteria 통과 후 `ever_delirium`이 붙은 hourly timeseries. `split` 컬럼은 `4_modeling.ipynb` 실행 후 추가됩니다.
-- `assessment_index_60min.csv`: 섬망 평가 시점 인덱스. transform 직후 컬럼은 `subject_id`, `stay_id`, `assessment_bin`, `delirium`, `ever_delirium`입니다. `split` 컬럼은 `4_modeling.ipynb` 실행 후 추가됩니다.
+- `all_events_12h_long.csv`: 전체 ICU stay의 chart/lab/medication event에 12시간 `bin`, `hours` 라벨을 붙인 long-format 이벤트. procedure/device row는 포함하지 않습니다.
+- `all_events_12h_wide_by_charttime.csv`: 전체 ICU stay의 charttime 기준 wide table. 같은 `stay_id`/`charttime`에 측정된 feature가 같은 row에 들어가고, 측정되지 않은 feature는 `NaN`입니다. procedure/device exposure는 해당 charttime이 interval 안에 있으면 `1`, 아니면 `0`입니다.
+- `events_12h_long.csv`: cohort criteria 통과 후 long-format 이벤트.
+- `events_12h_wide_by_charttime.csv`: cohort criteria 통과 후 charttime 기준 wide table.
+- `assessment_index_12h.csv`: 섬망 평가 시점 인덱스. transform 직후 컬럼은 `subject_id`, `hadm_id`, `stay_id`, `charttime`, `assessment_bin`, `assessment_hours`, `delirium`, `value_str`, `ever_delirium`입니다.
 - `cohort_final.csv`: cohort criteria를 통과한 stay-level cohort table.
-- `cohort_attrition.csv`: inclusion/exclusion criteria별 subject, admission, stay, timeseries row, assessment row 감소 요약.
+- `cohort_attrition.csv`: inclusion/exclusion criteria별 subject, admission, stay, 12시간 window 수 감소 요약.
+- `data_distribution_summary_12h.txt`: 현재 notebook에서 확인 가능한 row count, source/bin/delirium 분포, height/weight coverage, procedure exposure count, cohort attrition, delirium assessment 간격 요약.
 
-현재 transform 흐름에서는 `timeseries_imputed.csv`, `final_dataset.csv`, `assessment_dataset_60min.csv`를 생성하지 않습니다.
+현재 transform 흐름에서는 `all_timeseries.csv`, `timeseries_wide.csv`, `timeseries_imputed.csv`, `final_dataset.csv`, `assessment_dataset_60min.csv`, `hourly_timeseries_60min.csv`, `assessment_index_60min.csv`를 생성하지 않습니다.
 
 ## VALUE 변환 (문자열 → 숫자)
 
 원본 `value`는 `value_str`로 보존하고, `valuenum` 또는 문자열 규칙을 통해 숫자형 `value`를 만듭니다.
 
-`delirium`은 `chartevents`의 `Delirium assessment`에서 온 assessment-level outcome입니다.
+`delirium` 원천값은 `chartevents`의 `Delirium assessment`에서 온 assessment-level outcome입니다.
 
 - `Positive`는 `1`
 - `Negative`는 `0`
 - `UTA` 또는 기타 해석 불가능한 값은 `NaN`
-- 평가가 시행되지 않은 hourly bin도 `NaN`
+- wide table의 `delirium`은 12시간 `stay_id`/`bin` 단위 label입니다. 해당 bin 안 assessment 중 하나라도 `1`이면 `1`, assessment는 있지만 모두 `0`이면 `0`, assessment 자체가 없으면 `NaN`입니다.
 
-`delirium`의 `NaN`은 단순 feature 결측이 아니라 평가 미시행 시간을 의미합니다.
+wide table에서 `delirium`의 `NaN`은 단순 feature 결측이 아니라 해당 12시간 bin에 평가가 없었음을 의미합니다. 실제 assessment charttime의 원래 row는 long-format event와 `assessment_index_12h.csv`에서 확인합니다.
 
 ## 단위 변환
 
@@ -46,69 +48,95 @@
 - `Daily Weight`는 catalog에서 기존 `weight` feature로 통합되어 kg 단위로 처리됩니다.
 - inch height는 cm로 변환합니다.
 
+## Delirium assessment 간격 확인
+
+단위 변환 이후, 시간 계산 전에 `feature_name == 'delirium'`인 assessment timepoint를 `stay_id`, `charttime` 기준으로 정렬합니다.
+
+- 동일 `stay_id`/`charttime` 중복은 하나의 assessment timepoint로 간주합니다.
+- 같은 stay 안의 연속 assessment 간격을 시간 단위로 계산합니다.
+- 전체 mean/median 및 stay-level interval 요약을 출력합니다.
+
 ## 시간 계산 (ICU 입실 기준)
 
-`adm_pat_icu`의 ICU 입실/퇴실 정보를 붙이고, ICU 입실 후 경과시간 `hours`와 60분 단위 `bin`을 계산합니다.
+`adm_pat_icu`의 ICU 입실/퇴실 정보를 붙이고, ICU 입실 후 실제 경과시간으로 12시간 구간 라벨을 만듭니다.
 
-이후 cohort 기준에서 사용하는 `icu_los_hours`, `hours >= 24` 조건은 이 시간축을 기준으로 해석합니다.
+- `bin`: `1, 2, 3, 4, ...`
+- `hours`: `12, 24, 36, 48, ...`
+- `hours == bin * 12`
 
-## 60분 비닝 및 피봇 (최종 시계열)
+경계 처리는 `(0, 12]`, `(12, 24]`, `(24, 36]`처럼 구간 끝 시점 라벨을 사용합니다. 예를 들어 ICU 입실 후 정확히 12시간째 event는 `bin = 1`, `hours = 12`입니다.
 
-`stay_id`, `bin` 단위로 long-format event를 wide-format hourly timeseries로 pivot합니다.
+## 12시간 구간 라벨링 (long-format events)
 
-- 같은 stay-bin-feature에 여러 값이 있으면 `max`를 사용합니다.
-- `delirium` outcome은 lowercase 컬럼명으로 유지합니다.
-- medication point event는 실제 투약 event가 기록된 `charttime`의 hour만 `1`입니다.
-- event가 없는 hour의 medication feature는 `0`으로 채웁니다.
+chart/lab/eMAR medication event row는 집계하지 않고 유지합니다.
 
-## 처치/장치 노출 병합
+- row 단위는 원본 event입니다.
+- `stay_id`, `charttime`, `bin`, `feature_name`, `itemid` 순으로 정렬합니다.
+- 같은 12시간 bin 안의 여러 charttime을 합치지 않습니다.
+- procedure/device는 long event row로 추가하지 않습니다.
 
-`procedure_selected.csv`를 사용해 procedure/device interval과 겹치는 hourly bin을 exposure `1`로 표시합니다.
+## 12시간 구간 라벨링 (wide-format by charttime)
 
-- 종료 시간이 없으면 시작 시간을 종료 시간으로 사용합니다.
-- ICU stay의 `outtime`을 넘어가는 bin은 잘라냅니다.
-- observation window 안 노출 여부는 모델링 단계에서 window 길이에 맞춰 계산합니다.
+long-format chart/lab/medication event를 charttime 기준 wide-format으로 펼칩니다.
 
-## 기본정보 보간
-
-`weight`, `height`만 stay 안에서 첫 non-null 측정값을 전체 시간축에 확장합니다.
-
-- 첫 측정값이 있는 stay: 모든 hourly bin에 같은 값이 들어갑니다.
-- 첫 측정값이 없는 stay: 그대로 `NaN`입니다.
-- vital, lab, neuro 변수에는 hourly forward-fill, backward-fill, median imputation을 적용하지 않습니다.
-
-## 포함/제외 기준 적용
-
-Criteria는 hourly timeseries 생성과 exposure 병합 후 적용합니다.
-
-적용 순서:
-
-1. 전체 ICU stays from extraction
-2. 양수 ICU LOS: `icu_los_hours > 0`
-3. 24시간 이상 ICU LOS: `icu_los_hours >= 24`
-4. ICU 입실 24시간 이후 Delirium assessment 존재: `delirium` non-null and `hours >= 24`
-
-`cohort_attrition.csv`에는 각 단계의 `n_subjects`, `n_hadm`, `n_stays`, `timeseries_rows`, `assessment_rows`, 이전 단계 대비 제거 stay 수, 초기 대비 stay 비율이 저장됩니다.
+- row 단위는 `subject_id`, `hadm_id`, `stay_id`, `charttime`, `bin`, `hours`입니다.
+- column 단위는 `feature_name`입니다.
+- 같은 정확한 `charttime`에 측정된 feature들은 같은 row에 들어갑니다.
+- 해당 `charttime`에 측정되지 않은 feature는 `NaN`입니다.
+- 같은 12시간 bin 안의 여러 charttime은 `max`, `mean` 등으로 집계하지 않습니다.
+- 정확히 같은 `stay_id`/`charttime`/`feature_name` 중복만 첫 번째 관측값을 유지합니다.
+- `delirium`은 12시간 bin/window label입니다. 같은 `stay_id`/`bin` 안의 모든 charttime row는 같은 `delirium` 값을 갖습니다.
+- `height`, `weight`는 stay 안에서 가장 처음 측정된 값을 전체 charttime row에 채웁니다.
 
 ## ever_delirium 라벨 생성
 
-`ever_delirium`은 EDA와 subject-level split 확인을 위한 subject-level label입니다.
+`ever_delirium`은 EDA와 subject-level split 확인을 위한 subject-level label입니다. 12시간 bin/window `delirium` label 생성 직후, 포함/제외 기준 적용 전에 만듭니다.
 
-- 같은 `subject_id`에서 `delirium == 1`이 한 번이라도 있으면 `1`
+- 같은 `subject_id`에서 12시간 bin/window `delirium == 1`이 한 번이라도 있으면 `1`
 - 그렇지 않으면 `0`
 
 `ever_delirium`은 assessment-level outcome인 `delirium`을 대체하지 않습니다.
 
+## 처치/장치 노출 추가
+
+wide-format table을 먼저 만든 뒤, `procedure_selected.csv`의 interval을 적용합니다. Procedure/device interval은 미리 binning하지 않고 interval 형태로 유지합니다.
+
+- 종료 시간이 없으면 시작 시간을 종료 시간으로 사용합니다.
+- interval이 ICU stay의 `intime`/`outtime`을 벗어나면 ICU stay 구간으로 잘라냅니다.
+- procedure/device interval과 겹치는 실제 charttime row에만 procedure feature를 `1`로 표시합니다.
+- charttime row가 procedure interval 밖이면 같은 12시간 bin 안에 있더라도 `0`으로 둡니다.
+- procedure/device exposure 컬럼은 charttime row의 `charttime`이 procedure interval 안에 있으면 `1`, 아니면 `0`입니다.
+
+## 포함/제외 기준 적용
+
+Criteria는 12시간 라벨링과 wide table 생성 후 적용합니다.
+
+적용 순서:
+
+1. 전체 ICU stays from extraction
+2. 72시간 이상 ICU LOS: `icu_los_hours >= 72`
+
+12시간 window 수는 ICU LOS 기준으로 계산합니다.
+
+- `total_12h_windows`: `ceil(icu_los_hours / 12)`의 stay별 합.
+- `candidate_12h_windows_excl_first48_last24`: 첫 48시간과 마지막 24시간을 제외한 12시간 window의 stay별 합.
+
+`cohort_attrition.csv`에는 각 단계의 `n_subjects`, `n_hadm`, `n_stays`, 12시간 window 수, 이전 단계 대비 제거 stay 수, 초기 대비 stay 비율이 저장됩니다.
+
 ## 산출물 저장
 
-다음 산출물을 저장합니다.
+산출물은 마지막 셀에 몰아서 저장하지 않고, 각 데이터프레임이 완성되는 셀에서 바로 저장합니다.
 
-- `hourly_timeseries_60min.csv`
-- `assessment_index_60min.csv`
+- `events_12h_long.csv`
+- `events_12h_wide_by_charttime.csv`
+- `assessment_index_12h.csv`
 - `cohort_final.csv`
 - `cohort_attrition.csv`
+- `all_events_12h_long.csv`
+- `all_events_12h_wide_by_charttime.csv`
+- `data_distribution_summary_12h.txt`
 
-`assessment_index_60min.csv`는 섬망 평가가 실제로 시행된 시점만 모아둔 assessment-level index입니다. 각 행은 모델링 단계에서 예측 대상이 되는 평가 시점 1건이며, `assessment_bin` 직전 observation window를 `hourly_timeseries_60min.csv`에서 가져와 feature를 만들게 됩니다.
+`assessment_index_12h.csv`는 섬망 평가가 실제로 시행된 시점만 모아둔 assessment-level index입니다. 각 행은 모델링 단계에서 예측 대상이 되는 평가 시점 1건이며, `assessment_bin`과 `charttime`을 기준으로 observation window를 `events_12h_wide_by_charttime.csv`에서 가져와 feature를 만들게 됩니다.
 
 ## 다음 단계
 

@@ -2,14 +2,15 @@
 
 이 문서는 `4_modeling.ipynb`에서 수행할 모델링 단계 작업 계획입니다. `3_eda.ipynb`는 별도 EDA 노트북입니다.
 
-Transform 단계는 hourly timeseries와 assessment index까지만 만듭니다. 모델링 단계에서는 subject-level train/test split을 생성한 뒤 observation window feature를 만들고, train 기준으로 feature selection과 imputation을 수행합니다.
+Transform 단계는 12시간 라벨이 붙은 long-format event, charttime 기준 wide table, assessment index까지만 만듭니다. 모델링 단계에서는 subject-level train/test split을 생성한 뒤 observation window feature를 만들고, train 기준으로 feature selection과 imputation을 수행합니다.
 
 ## 입력 파일
 
 `processed/transform/`:
 
-- `hourly_timeseries_60min.csv`: cohort criteria를 통과한 hourly timeseries. `ever_delirium` 포함.
-- `assessment_index_60min.csv`: assessment-level index. `subject_id`, `stay_id`, `assessment_bin`, `delirium`, `ever_delirium` 포함.
+- `events_12h_wide_by_charttime.csv`: cohort criteria를 통과한 charttime 기준 wide table. 같은 12시간 bin 안의 여러 charttime은 집계하지 않습니다.
+- `events_12h_long.csv`: cohort criteria를 통과한 12시간 라벨 long-format event table. `ever_delirium` 포함.
+- `assessment_index_12h.csv`: assessment-level index. `subject_id`, `hadm_id`, `stay_id`, `charttime`, `assessment_bin`, `assessment_hours`, `delirium`, `ever_delirium` 포함.
 - `cohort_final.csv`: cohort criteria를 통과한 stay-level cohort table.
 
 `split` 컬럼과 `train_subject_ids.csv`, `test_subject_ids.csv`는 이 노트북의 `## 환자 단위 무작위 train/test 분할`, `## Split 산출물 저장` 이후 생성됩니다.
@@ -25,8 +26,9 @@ Transform 단계는 hourly timeseries와 assessment index까지만 만듭니다.
 
 현재 `4_modeling.ipynb`에 구현된 두 번째 섹션입니다.
 
-- `hourly_timeseries_60min.csv`에 `split` 컬럼을 저장합니다.
-- `assessment_index_60min.csv`에 `split` 컬럼을 저장합니다.
+- `events_12h_wide_by_charttime.csv`에 `split` 컬럼을 저장합니다.
+- `events_12h_long.csv`에 `split` 컬럼을 저장합니다.
+- `assessment_index_12h.csv`에 `split` 컬럼을 저장합니다.
 - `cohort_final.csv`에 `split` 컬럼을 저장합니다.
 - `train_subject_ids.csv`, `test_subject_ids.csv`를 저장합니다.
 
@@ -38,16 +40,16 @@ Transform 단계는 hourly timeseries와 assessment index까지만 만듭니다.
 
 ## Observation Window 후보
 
-섬망 평가 시점 `assessment_bin = b`에 대해 직전 observation window를 만듭니다.
+섬망 평가 시점 `charttime = t`와 `assessment_bin = b`에 대해 직전 observation window를 만듭니다.
 
 후보 window 길이는 모델링 노트북에서 비교합니다. 기본 후보:
 
-- 4시간: `b-3`부터 `b`
-- 8시간: `b-7`부터 `b`
-- 12시간: `b-11`부터 `b`
-- 24시간: `b-23`부터 `b`
+- 4시간: assessment `charttime` 기준 직전 4시간
+- 8시간: assessment `charttime` 기준 직전 8시간
+- 12시간: assessment `charttime` 기준 직전 12시간
+- 24시간: assessment `charttime` 기준 직전 24시간
 
-각 후보는 평가 시점을 포함합니다. Window 시작 전 데이터가 부족한 assessment를 어떻게 처리할지는 train set에서 비교 가능하도록 명시적으로 기록합니다.
+각 후보는 평가 시점을 포함합니다. `assessment_bin`은 12시간 라벨이므로 window 경계 계산 자체는 `charttime`으로 수행합니다. Window 시작 전 데이터가 부족한 assessment를 어떻게 처리할지는 train set에서 비교 가능하도록 명시적으로 기록합니다.
 
 기본안:
 
@@ -56,13 +58,15 @@ Transform 단계는 hourly timeseries와 assessment index까지만 만듭니다.
 
 ## Feature 생성
 
-Feature 생성은 `hourly_timeseries_60min.csv`와 `assessment_index_60min.csv`를 결합해 수행합니다.
+Feature 생성은 `events_12h_wide_by_charttime.csv`와 `assessment_index_12h.csv`를 결합해 수행합니다.
 
 식별/metadata:
 
 - `subject_id`
 - `stay_id`
+- `charttime`
 - `assessment_bin`
+- `assessment_hours`
 - `split`
 - `delirium`
 
@@ -84,9 +88,11 @@ Binary exposure:
 - procedure/device feature
 - window 안에서 한 번이라도 exposure가 있으면 `1`, 아니면 `0`
 
-Medication feature는 transform 단계에서 실제 투약 event가 기록된 hourly bin만 `1`입니다. 모델링 단계에서는 candidate observation window 안에 해당 medication feature가 한 번이라도 `1`이면 window-level exposure `1`로 집계합니다.
+Transform wide table의 `delirium`은 12시간 `stay_id`/`bin` 단위 label입니다. 해당 bin 안 assessment 중 하나라도 positive면 `1`, assessment는 있지만 positive가 없으면 `0`, assessment 자체가 없으면 `NaN`입니다. 실제 assessment charttime의 원래 row는 long-format event와 `assessment_index_12h.csv`에서 확인합니다.
 
-Procedure/device feature는 transform 단계에서 procedure interval과 겹치는 hourly bin이 이미 `1`입니다. 모델링 단계에서는 medication과 동일하게 window 안 max 값으로 window-level exposure를 만듭니다.
+Medication feature는 transform 단계에서 실제 투약 event가 기록된 charttime row만 `1`입니다. 모델링 단계에서는 candidate observation window 안에 해당 medication feature가 한 번이라도 `1`이면 window-level exposure `1`로 집계합니다.
+
+Procedure/device feature는 transform 단계에서 charttime row의 `charttime`이 procedure interval 안에 들어오면 `1`입니다. 모델링 단계에서는 medication과 동일하게 window 안 max 값으로 window-level exposure를 만듭니다.
 
 연속형 임상 변수:
 
