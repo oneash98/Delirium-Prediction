@@ -76,7 +76,7 @@ Parkinson/data/*.csv
 - `services.csv`를 필수 입력으로 사용하고 ICU 입실 시점의 `curr_service`를 `specialty`로 결합합니다.
 - ICU 재원시간이 양수인 stay만 유지합니다.
 - `1_data_extraction.ipynb`에서는 위 기준을 적용하지 않고 전체 ICU stay 테이블을 저장합니다.
-- `2_data_transform.ipynb`에서 ICU LOS 72시간 이상, ICU 입실 72시간 이후 delirium assessment 1회 이상 기준을 순서대로 적용하고 `cohort_attrition.csv`로 저장합니다.
+- `2_data_transform.ipynb`에서 ICU LOS 72시간 이상 기준을 적용하고 `cohort_attrition.csv`로 저장합니다.
 
 ## Outcome 정의
 

@@ -140,7 +140,6 @@ Criteria는 12시간 라벨링과 wide table 생성 후 적용합니다.
 
 1. 전체 ICU stays from extraction
 2. 72시간 이상 ICU LOS: `icu_los_hours >= 72`
-3. ICU 입실 72시간 이후 delirium assessment가 1회 이상 있는 stay: `hours_since_icu_admit > 72`
 
 12시간 window 수는 ICU LOS 기준으로 계산합니다.
 
