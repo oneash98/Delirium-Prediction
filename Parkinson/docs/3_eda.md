@@ -7,11 +7,10 @@
 `processed/transform/`:
 
 - `events_12h_wide_by_charttime.csv`: cohort criteria를 통과한 charttime 기준 wide table.
+- `events_12h_binned.csv`: cohort criteria를 통과한 12시간 bin-level wide table.
 - `events_12h_long.csv`: cohort criteria를 통과한 12시간 라벨 long-format event table.
-- `assessment_index_12h.csv`: 섬망 평가 시점 index.
 - `cohort_final.csv`: cohort criteria를 통과한 stay-level cohort table.
 - `cohort_attrition.csv`: inclusion/exclusion criteria별 attrition table.
-- `all_events_filtered.csv`: lab 측정 주기 확인에 사용하는 long-format event table.
 
 ## 노트북 순서
 
@@ -19,9 +18,10 @@
 
 | 노트북 소제목 | 확인 내용 |
 | --- | --- |
-| `## EDA: 환자 기본정보와 ever_delirium` | subject/stay 수, cohort 기간, `ever_delirium` 분포, 기본정보 요약 |
+| `## EDA: 환자 기본정보와 ever_delirium` | subject/stay 수, cohort 기간, `ever_delirium` 분포, specialty 포함 기본정보 요약 |
 | `## EDA: 섬망 평가 주기` | assessment count, interval, first assessment hour, assessment frequency |
 | `## EDA: 검사실(lab) 측정 주기` | lab feature별 측정 수, coverage, 측정 간격 |
+| `## EDA: Feature missingness` | 12시간 bin-level feature별 observed/missing 비율 |
 
 ## EDA: 환자 기본정보와 ever_delirium
 
@@ -30,6 +30,7 @@
 - Parkinson cohort 기간
 - subject-level `ever_delirium` 분포
 - age, gender, race, admission_type, ICU LOS 요약
+- `specialty`가 있으면 `ever_delirium`별 specialty 분포
 - `ever_delirium`별 기본정보 비교
 
 ## EDA: 섬망 평가 주기
@@ -50,4 +51,6 @@
 ## 주의사항
 
 - EDA는 전체 cohort의 관측 패턴을 확인하기 위한 단계입니다.
+- Lab 측정 주기는 cohort-filtered `events_12h_long.csv`의 `labevents` row를 기준으로 계산합니다.
+- Feature missingness는 `events_12h_binned.csv`의 12시간 bin row를 기준으로 계산합니다.
 - 실제 feature 제외, missingness threshold, imputation 값 결정은 `4_modeling.ipynb`에서 train set 기준으로 수행합니다.

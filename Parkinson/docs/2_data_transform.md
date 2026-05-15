@@ -17,10 +17,12 @@
 - `all_events_filtered.csv`: 값 숫자화와 단위 변환이 반영된 chart/lab/medication long-format 이벤트.
 - `all_events_12h_long.csv`: 전체 ICU stay의 chart/lab/medication event에 12시간 `bin`, `hours` 라벨을 붙인 long-format 이벤트. procedure/device row는 포함하지 않습니다.
 - `all_events_12h_wide_by_charttime.csv`: 전체 ICU stay의 charttime 기준 wide table. 같은 `stay_id`/`charttime`에 측정된 feature가 같은 row에 들어가고, 측정되지 않은 feature는 `NaN`입니다. procedure/device exposure는 해당 charttime이 interval 안에 있으면 `1`, 아니면 `0`입니다.
+- `all_events_12h_binned.csv`: 전체 ICU stay의 12시간 bin-level wide table. `extraction_variable_catalog.csv`의 `binning` 규칙에 따라 aggregation, most recent, at least once, static feature를 생성합니다.
 - `events_12h_long.csv`: cohort criteria 통과 후 long-format 이벤트.
 - `events_12h_wide_by_charttime.csv`: cohort criteria 통과 후 charttime 기준 wide table.
+- `events_12h_binned.csv`: cohort criteria 통과 후 12시간 bin-level wide table.
 - `assessment_index_12h.csv`: 섬망 평가 시점 인덱스. transform 직후 컬럼은 `subject_id`, `hadm_id`, `stay_id`, `charttime`, `assessment_bin`, `assessment_hours`, `delirium`, `value_str`, `ever_delirium`입니다.
-- `cohort_final.csv`: cohort criteria를 통과한 stay-level cohort table.
+- `cohort_final.csv`: cohort criteria를 통과한 stay-level cohort table. extraction 단계에서 `specialty`가 생성되면 그대로 포함합니다.
 - `cohort_attrition.csv`: inclusion/exclusion criteria별 subject, admission, stay, 12시간 window 수 감소 요약.
 - `data_distribution_summary_12h.txt`: 현재 notebook에서 확인 가능한 row count, source/bin/delirium 분포, height/weight coverage, procedure exposure count, cohort attrition, delirium assessment 간격 요약.
 
@@ -85,17 +87,7 @@ long-format chart/lab/medication event를 charttime 기준 wide-format으로 펼
 - 해당 `charttime`에 측정되지 않은 feature는 `NaN`입니다.
 - 같은 12시간 bin 안의 여러 charttime은 `max`, `mean` 등으로 집계하지 않습니다.
 - 정확히 같은 `stay_id`/`charttime`/`feature_name` 중복만 첫 번째 관측값을 유지합니다.
-- `delirium`은 12시간 bin/window label입니다. 같은 `stay_id`/`bin` 안의 모든 charttime row는 같은 `delirium` 값을 갖습니다.
 - `height`, `weight`는 stay 안에서 가장 처음 측정된 값을 전체 charttime row에 채웁니다.
-
-## ever_delirium 라벨 생성
-
-`ever_delirium`은 EDA와 subject-level split 확인을 위한 subject-level label입니다. 12시간 bin/window `delirium` label 생성 직후, 포함/제외 기준 적용 전에 만듭니다.
-
-- 같은 `subject_id`에서 12시간 bin/window `delirium == 1`이 한 번이라도 있으면 `1`
-- 그렇지 않으면 `0`
-
-`ever_delirium`은 assessment-level outcome인 `delirium`을 대체하지 않습니다.
 
 ## 처치/장치 노출 추가
 
@@ -107,19 +99,53 @@ wide-format table을 먼저 만든 뒤, `procedure_selected.csv`의 interval을 
 - charttime row가 procedure interval 밖이면 같은 12시간 bin 안에 있더라도 `0`으로 둡니다.
 - procedure/device exposure 컬럼은 charttime row의 `charttime`이 procedure interval 안에 있으면 `1`, 아니면 `0`입니다.
 
+## delirium 라벨 생성
+
+charttime 기준 wide table에 12시간 bin/window 단위 `delirium` label을 붙입니다.
+
+- 같은 `stay_id`/`bin` 안 assessment 중 하나라도 `1`이면 `1`입니다.
+- assessment는 있지만 모두 `0`이면 `0`입니다.
+- assessment 자체가 없으면 `NaN`입니다.
+- 같은 `stay_id`/`bin` 안의 모든 charttime row는 같은 `delirium` 값을 갖습니다.
+
+## ever_delirium 라벨 생성
+
+`ever_delirium`은 EDA와 subject-level split 확인을 위한 subject-level label입니다. 12시간 bin/window `delirium` label 생성 직후, 포함/제외 기준 적용 전에 만듭니다.
+
+- 같은 `subject_id`에서 12시간 bin/window `delirium == 1`이 한 번이라도 있으면 `1`
+- 그렇지 않으면 `0`
+
+`ever_delirium`은 assessment-level outcome인 `delirium`을 대체하지 않습니다.
+
+## 12시간 binning
+
+charttime 기준 wide table과 별도로, 12시간 bin을 row 단위로 하는 `all_events_12h_binned.csv`를 생성합니다. 이 table은 `extraction_variable_catalog.csv`의 `binning` 컬럼을 기준으로 feature별 집계 방식을 적용합니다.
+
+- row 단위는 `subject_id`, `hadm_id`, `stay_id`, `bin`, `hours`, `bin_start`, `bin_end`입니다.
+- 기본 정보로 `age`, `gender`, `los_hours`, `admission_type`, `race`, `specialty`, `hospital_expire_flag`, `intime`, `outtime`을 가능한 컬럼 범위에서 유지합니다.
+- `aggregation`: 같은 stay/bin/feature 안의 numeric value로 `mean`, `median`, `std`, `count`, `min`, `max`, `latest` 컬럼을 만듭니다. 컬럼명은 `{feature}_{stat}` 형식입니다.
+- `most recent`: 각 bin 안의 최신값을 사용하고, stay 안에서 이전 bin의 값을 forward-fill합니다.
+- `at least once`: medication, delirium assessment 같은 point event는 bin 안에 한 번이라도 있으면 `1`, 없으면 `0`입니다.
+- `prev_delirium`: 같은 stay의 직전 12시간 bin에서의 `delirium` 결과입니다. 첫 bin은 입원 전 직전 delirium 결과가 없으므로 `0`으로 둡니다.
+- `static`: height/weight 같은 event-derived static feature는 stay 안의 첫 관측값을 전체 bin에 반복합니다. `age`, `gender`는 admission/patient 정보에서 가져옵니다.
+- procedure/device interval은 12시간 bin과 겹치면 해당 procedure feature를 `1`로 표시합니다. charttime 기준 wide table과 달리 interval과 bin의 overlap 기준입니다.
+
 ## 포함/제외 기준 적용
 
 Criteria는 12시간 라벨링과 wide table 생성 후 적용합니다.
+
+모델링은 12시간 bin을 time step으로 쓰는 LSTM 구조를 전제로 합니다. 4개 time step의 feature를 입력으로 넣고, 입력의 4번째 time step 및 그 다음 2개 time step의 delirium 여부를 예측합니다. 따라서 최소 6개 time step, 즉 72시간 ICU stay가 필요합니다.
 
 적용 순서:
 
 1. 전체 ICU stays from extraction
 2. 72시간 이상 ICU LOS: `icu_los_hours >= 72`
+3. ICU 입실 72시간 이후 delirium assessment가 1회 이상 있는 stay: `hours_since_icu_admit > 72`
 
 12시간 window 수는 ICU LOS 기준으로 계산합니다.
 
 - `total_12h_windows`: `ceil(icu_los_hours / 12)`의 stay별 합.
-- `candidate_12h_windows_excl_first48_last24`: 첫 48시간과 마지막 24시간을 제외한 12시간 window의 stay별 합.
+- `candidate_12h_windows_excl_first48_last12`: LSTM 입력 4개 time step에 해당하는 첫 48시간과 퇴실 직전 마지막 12시간을 제외한 12시간 window의 stay별 합.
 
 `cohort_attrition.csv`에는 각 단계의 `n_subjects`, `n_hadm`, `n_stays`, 12시간 window 수, 이전 단계 대비 제거 stay 수, 초기 대비 stay 비율이 저장됩니다.
 
@@ -129,11 +155,13 @@ Criteria는 12시간 라벨링과 wide table 생성 후 적용합니다.
 
 - `events_12h_long.csv`
 - `events_12h_wide_by_charttime.csv`
+- `events_12h_binned.csv`
 - `assessment_index_12h.csv`
 - `cohort_final.csv`
 - `cohort_attrition.csv`
 - `all_events_12h_long.csv`
 - `all_events_12h_wide_by_charttime.csv`
+- `all_events_12h_binned.csv`
 - `data_distribution_summary_12h.txt`
 
 `assessment_index_12h.csv`는 섬망 평가가 실제로 시행된 시점만 모아둔 assessment-level index입니다. 각 행은 모델링 단계에서 예측 대상이 되는 평가 시점 1건이며, `assessment_bin`과 `charttime`을 기준으로 observation window를 `events_12h_wide_by_charttime.csv`에서 가져와 feature를 만들게 됩니다.

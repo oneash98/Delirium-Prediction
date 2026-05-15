@@ -56,8 +56,10 @@ Parkinson/data/*.csv
        all_events_filtered.csv
        all_events_12h_long.csv
        all_events_12h_wide_by_charttime.csv
+       all_events_12h_binned.csv
        events_12h_long.csv
        events_12h_wide_by_charttime.csv
+       events_12h_binned.csv
        assessment_index_12h.csv
        cohort_final.csv
        data_distribution_summary_12h.txt
@@ -71,9 +73,10 @@ Parkinson/data/*.csv
 ## 코호트 기준
 
 - ICU stay 단위로 `patients`, `admissions`, `icustays`를 결합합니다.
+- `services.csv`를 필수 입력으로 사용하고 ICU 입실 시점의 `curr_service`를 `specialty`로 결합합니다.
 - ICU 재원시간이 양수인 stay만 유지합니다.
 - `1_data_extraction.ipynb`에서는 위 기준을 적용하지 않고 전체 ICU stay 테이블을 저장합니다.
-- `2_data_transform.ipynb`에서 ICU LOS 72시간 이상 기준을 적용하고 `cohort_attrition.csv`로 저장합니다.
+- `2_data_transform.ipynb`에서 ICU LOS 72시간 이상, ICU 입실 72시간 이후 delirium assessment 1회 이상 기준을 순서대로 적용하고 `cohort_attrition.csv`로 저장합니다.
 
 ## Outcome 정의
 
@@ -95,10 +98,11 @@ Parkinson/data/*.csv
 - chart/lab/medication event는 long-format에서 집계하지 않고 유지합니다.
 - wide table은 charttime 기준입니다. 같은 정확한 `stay_id`/`charttime`에 측정된 feature만 같은 row에 들어가며, 같은 12시간 bin 안의 여러 charttime을 `max`로 합치지 않습니다.
 - 단, wide table의 `delirium`은 12시간 bin/window label로 별도 생성합니다.
+- 별도 12시간 bin-level wide table인 `all_events_12h_binned.csv`와 cohort-filtered `events_12h_binned.csv`를 생성합니다. 이 table은 `extraction_variable_catalog.csv`의 `binning` 규칙에 따라 `aggregation`, `most recent`, `at least once`, `static` feature를 만듭니다.
 - 단위는 공통 단위로 맞춥니다. 예: Fahrenheit to Celsius, pounds to kg, FiO2 0-1 to percent.
 - 변환 rule 적용 후에도 같은 `source_table` + `feature_name` 안에 `valueuom`이 2개 이상이면 unit별 feature로 분리합니다.
 - 약물 feature는 extraction 단계에서 `all_events_long.csv`에 point event로 포함하며, 실제 투약 charttime에 `1`로 둡니다.
-- 처치/장치는 long event row로 만들거나 미리 binning하지 않고, charttime 기준 wide table에서 현재 row의 `charttime`이 처치/장치 interval 안에 들어오면 procedure exposure를 `1`로 표시합니다.
+- 처치/장치는 long event row로 만들지 않습니다. charttime 기준 wide table에서는 현재 row의 `charttime`이 interval 안에 들어오면 `1`, 12시간 bin-level table에서는 procedure interval이 bin과 겹치면 `1`로 표시합니다.
 - 체중/키는 wide table에서 stay 안의 첫 측정값으로 전체 charttime row를 채웁니다.
 - 활력징후, Lab, neuro 변수는 transform 단계에서 시간별 보간하지 않습니다.
 
@@ -112,6 +116,10 @@ Parkinson/data/*.csv
 - split: `4_modeling.ipynb` 실행 후 subject-level random train/test split
 
 Observation window별 feature 생성, 약물/procedure window-level exposure, train 기준 imputation은 모델링 단계에서 수행합니다.
+
+기본 모델링 방향은 12시간 bin을 time step으로 쓰는 LSTM입니다. 연속 4개 time step의 feature를 입력으로 사용하고, 입력의 4번째 time step 및 다음 2개 time step의 delirium 여부를 예측합니다. ICU LOS 72시간 기준은 최소 6개 12시간 time step을 확보하기 위한 기준이며, candidate window count는 첫 48시간과 퇴실 직전 마지막 12시간을 제외한 bin 수를 기록합니다.
+
+12시간 bin-level table에는 `prev_delirium` feature가 포함됩니다. 이는 같은 stay의 직전 bin `delirium` 결과이며 첫 bin은 `0`입니다.
 
 ## 작업 시 주의사항
 
