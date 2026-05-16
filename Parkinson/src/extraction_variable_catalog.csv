@@ -26,19 +26,19 @@ chartevents,224639,,Daily Weight,weight,kg,numeric,,static
 chartevents,226730,,Height (cm),height,cm,numeric,,static
 chartevents,226707,,Height,height,Inch,numeric,convert inches to cm,static
 chartevents,220621,,Glucose (serum),glucose,mg/dL,numeric,,aggregation
-chartevents,225664,,Glucose finger stick (range 70-100),glucose,mg/dL,numeric,,aggregation
 chartevents,226537,,Glucose (whole blood),glucose,mg/dL,numeric,,aggregation
 labevents,50931,blood chemistry,Glucose,glucose,mg/dL,numeric,,aggregation
 labevents,52569,blood chemistry,Glucose,glucose,mg/dL,numeric,,aggregation
-labevents,50882,blood chemistry,Bicarbonate,bicarbonate,mEq/L,numeric,,most recent
-labevents,50803,blood gas,"Calculated Bicarbonate, Whole Blood",bicarbonate_gas,mEq/L,numeric,,most recent
-labevents,50893,blood chemistry,"Calcium, Total",calcium_free,mg/dL,numeric,,most recent
+labevents,50803,blood gas,"Calculated Bicarbonate, Whole Blood",bicarbonate,mEq/L,numeric,,most recent
+labevents,50893,blood chemistry,"Calcium, Total",calcium,mg/dL,numeric,,most recent
 labevents,50902,blood chemistry,Chloride,chloride,mEq/L,numeric,,most recent
 labevents,52535,blood chemistry,Chloride,chloride,mEq/L,numeric,,most recent
 labevents,50983,blood chemistry,Sodium,sodium,mEq/L,numeric,,most recent
 labevents,52623,blood chemistry,Sodium,sodium,mEq/L,numeric,,most recent
 labevents,50971,blood chemistry,Potassium,potassium,mEq/L,numeric,,most recent
 labevents,52610,blood chemistry,Potassium,potassium,mEq/L,numeric,,most recent
+labevents,50866,blood chemistry,Ammonia,ammonia,umol/L,numeric,,most recent
+labevents,50902,blood chemistry,Chloride,chloride,mEq/L,numeric,,most recent
 labevents,51006,blood chemistry,Urea Nitrogen,BUN,mg/dL,numeric,,most recent
 labevents,52647,blood chemistry,Urea Nitrogen,BUN,mg/dL,numeric,,most recent
 labevents,50912,blood chemistry,Creatinine,creatinine,mg/dL,numeric,,most recent
@@ -51,7 +51,6 @@ labevents,50861,blood chemistry,Alanine Aminotransferase (ALT),alt,IU/L,numeric,
 labevents,50878,blood chemistry,Asparate Aminotransferase (AST),ast,IU/L,numeric,,most recent
 labevents,50885,blood chemistry,"Bilirubin, Total",bilirubin_total,mg/dL,numeric,,most recent
 labevents,50883,blood chemistry,"Bilirubin, Direct",bilirubin_direct,mg/dL,numeric,,most recent
-labevents,50884,blood chemistry,"Bilirubin, Indirect",bilirubin_indirect,mg/dL,numeric,,most recent
 labevents,50810,blood gas,"Hematocrit, Calculated",hematocrit,%,numeric,,most recent
 labevents,51221,blood hematology,Hematocrit,hematocrit,%,numeric,,most recent
 labevents,51638,blood chemistry,Hematocrit,hematocrit,%,numeric,,most recent
@@ -62,6 +61,7 @@ labevents,51265,blood hematology,Platelet Count,platelet_count,K/uL,numeric,,mos
 labevents,51300,blood hematology,WBC Count,wbc,K/uL,numeric,,most recent
 labevents,51301,blood hematology,White Blood Cells,wbc,K/uL,numeric,,most recent
 labevents,51755,blood chemistry,White Blood Cells,wbc,K/uL,numeric,,most recent
+labevents,50909,blood chemistry,Cortisol,cortisol,ug/dL,numeric,,most recent
 labevents,50820,blood gas,pH,ph,units,numeric,,most recent
 labevents,50818,blood gas,pCO2,pco2,mm Hg,numeric,,most recent
 labevents,50821,blood gas,pO2,po2,mm Hg,numeric,,most recent
@@ -207,4 +207,3 @@ emar,,,Phenylephrine 2.5 % Ophth Soln,vasopressor,,binary,positive(1)  if  the o
 emar,,,PHENYLEPHrinePhenylephrine 10 % Ophth Soln,vasopressor,,binary,positive(1)  if  the observation window overlaps the charttime,at least once
 emar,,,NORepinephrine,vasopressor,,binary,positive(1)  if  the observation window overlaps the charttime,at least once
 emar,,,Norepinephrine,vasopressor,,binary,positive(1)  if  the observation window overlaps the charttime,at least once
-,,,,,,,,
