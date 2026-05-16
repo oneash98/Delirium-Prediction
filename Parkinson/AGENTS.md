@@ -14,7 +14,7 @@ MIMIC-IV 기반 Parkinson 코호트에서 ICU 섬망 평가를 outcome으로 사
 
 - `src/1_data_extraction.ipynb`: 원천 MIMIC-IV CSV에서 cohort, chart, lab, medication, procedure 이벤트를 추출합니다.
 - `src/2_data_transform.ipynb`: 추출 결과를 숫자화, 단위 통일, 12시간 구간 라벨링, charttime 기준 wide 변환, cohort 기준 적용 산출물로 변환합니다.
-- `src/3_eda.ipynb`: transform 산출물을 읽어 환자 기본정보, 섬망 평가 주기, lab 측정 주기 EDA를 수행합니다.
+- `src/3_eda.ipynb`: transform 산출물을 읽어 환자 기본정보와 12시간 bin-level feature missingness EDA를 수행합니다.
 - `src/4_modeling.ipynb`: transform 산출물을 읽어 subject-level train/test split을 만들고 모델링 입력 준비를 시작합니다.
 - `src/extraction_variable_catalog.md`: 추출 대상 변수 catalog 문서입니다.
 - `src/extraction_variable_catalog.csv`: 추출 대상 변수 catalog의 CSV 버전입니다.

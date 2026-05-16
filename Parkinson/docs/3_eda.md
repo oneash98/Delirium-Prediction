@@ -1,16 +1,26 @@
 # 3_eda.ipynb 설명
 
-`src/3_eda.ipynb`는 `2_data_transform.ipynb`가 만든 cohort 산출물을 읽어 feature engineering 전 데이터 구조를 확인합니다. 이 노트북은 산출 CSV를 새로 만들거나 train/test split을 생성하지 않습니다.
+`src/3_eda.ipynb`는 `2_data_transform.ipynb`가 만든 12시간 bin-level 산출물과 최종 cohort를 읽어 EDA 표와 그림을 생성합니다. 이 노트북은 train/test split을 생성하지 않습니다.
 
 ## 입력 파일
 
 `processed/transform/`:
 
-- `events_12h_wide_by_charttime.csv`: cohort criteria를 통과한 charttime 기준 wide table.
 - `events_12h_binned.csv`: cohort criteria를 통과한 12시간 bin-level wide table.
-- `events_12h_long.csv`: cohort criteria를 통과한 12시간 라벨 long-format event table.
 - `cohort_final.csv`: cohort criteria를 통과한 stay-level cohort table.
-- `cohort_attrition.csv`: inclusion/exclusion criteria별 attrition table.
+
+## 출력 파일
+
+`outputs/eda/`:
+
+- `delirium_label_summary.csv`
+- `delirium_distribution.png`
+- `baseline_characteristics_plots.png`
+- `specialty_distribution_by_delirium.csv`
+- `specialty_distribution_by_delirium.png`
+- `normality_summary.csv`
+- `normality_diagnostics.png`
+- `table1_characteristics.csv`
 
 ## 노트북 순서
 
@@ -18,39 +28,22 @@
 
 | 노트북 소제목 | 확인 내용 |
 | --- | --- |
-| `## EDA: 환자 기본정보와 ever_delirium` | subject/stay 수, cohort 기간, `ever_delirium` 분포, specialty 포함 기본정보 요약 |
-| `## EDA: 섬망 평가 주기` | assessment count, interval, first assessment hour, assessment frequency |
-| `## EDA: 검사실(lab) 측정 주기` | lab feature별 측정 수, coverage, 측정 간격 |
-| `## EDA: Feature missingness` | 12시간 bin-level feature별 observed/missing 비율 |
+| `## EDA: 환자 기본정보` | subject/stay 수, subject-level `ever_delirium` 분포, 12시간 bin-level delirium label 분포, 기본정보 시각화, specialty 분포, age/height/weight/LOS 정규성 진단, Table 1 형태의 baseline characteristics |
 
-## EDA: 환자 기본정보와 ever_delirium
+## EDA: 환자 기본정보
 
 - subject 수, stay 수
 - subject당 ICU stay 수
-- Parkinson cohort 기간
 - subject-level `ever_delirium` 분포
-- age, gender, race, admission_type, ICU LOS 요약
-- `specialty`가 있으면 `ever_delirium`별 specialty 분포
-- `ever_delirium`별 기본정보 비교
-
-## EDA: 섬망 평가 주기
-
-- assessment row 수
-- stay/subject별 assessment count
-- stay 안에서 assessment 간격 median/IQR
-- ICU 입실 후 첫 assessment까지 걸린 시간
-- ICU 12시간 bin/day당 assessment 빈도
-
-## EDA: 검사실(lab) 측정 주기
-
-- lab feature별 측정 count
-- lab feature별 stay/subject coverage
-- lab feature별 stay 내부 측정 간격 median/IQR
-- 어떤 lab이든 측정된 시점 기준의 전체 lab 간격
+- 12시간 bin-level 전체 label, 48시간 이후 label, 36시간까지 label의 delirium 개수와 비율
+- subject-level sex, age, height, weight, ICU LOS 분포 시각화
+- top 10 specialty의 No delirium / Ever delirium subject 수 기준 별도 분포
+- age, height, weight, ICU LOS의 Shapiro-Wilk test, histogram, Q-Q plot
+- Delirium vs Non-delirium subject-level baseline characteristics table: age, sex, height, weight, ICU LOS, race, admission type, specialty
 
 ## 주의사항
 
 - EDA는 전체 cohort의 관측 패턴을 확인하기 위한 단계입니다.
-- Lab 측정 주기는 cohort-filtered `events_12h_long.csv`의 `labevents` row를 기준으로 계산합니다.
-- Feature missingness는 `events_12h_binned.csv`의 12시간 bin row를 기준으로 계산합니다.
-- 실제 feature 제외, missingness threshold, imputation 값 결정은 `4_modeling.ipynb`에서 train set 기준으로 수행합니다.
+- Height와 weight는 `events_12h_binned.csv`에서 subject별 median으로 요약해 `subject_summary`에 붙입니다.
+- Height는 non-missing subject 수가 적어 정규성 검정과 Table 1 p-value 해석에 주의가 필요합니다.
+- Table 1의 연속형 변수 p-value는 Mann-Whitney U test, 범주형 변수 p-value는 chi-square test를 사용합니다.
