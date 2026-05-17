@@ -124,7 +124,10 @@ charttime 기준 wide table과 별도로, 12시간 bin을 row 단위로 하는 `
 - row 단위는 `subject_id`, `hadm_id`, `stay_id`, `bin`, `hours`, `bin_start`, `bin_end`입니다.
 - 기본 정보로 `age`, `gender`, `los_hours`, `admission_type`, `race`, `specialty`, `hospital_expire_flag`, `intime`, `outtime`을 가능한 컬럼 범위에서 유지합니다.
 - `aggregation`: 같은 stay/bin/feature 안의 numeric value로 `mean`, `median`, `std`, `count`, `min`, `max`, `latest` 컬럼을 만듭니다. 컬럼명은 `{feature}_{stat}` 형식입니다.
-- `most recent`: 각 bin 안의 최신값을 사용하고, stay 안에서 이전 bin의 값을 forward-fill합니다.
+  - 해당 bin의 측정 횟수 `count < 3`이면 `std`는 `NaN`으로 둡니다.
+  - 해당 bin에 측정값이 없고 같은 stay의 직전 관측 `latest`가 있으면, 그 직전 `latest` 하나로 `mean`, `median`, `min`, `max`, `latest`를 채우고 `count = 1`, `std = NaN`으로 둡니다.
+  - 첫 번째 bin에 측정값이 없고 두 번째 bin에 측정값이 있으면, 두 번째 bin의 가장 이른 측정값 하나로 첫 번째 bin의 `mean`, `median`, `min`, `max`, `latest`를 채우고 `count = 1`, `std = NaN`으로 둡니다.
+- `most recent`: 각 bin 안의 최신값을 사용하고, stay 안에서 이전 bin의 값을 forward-fill합니다. 첫 번째 bin에 값이 없고 두 번째 bin에 값이 있으면, 두 번째 bin의 최신값으로 첫 번째 bin만 채웁니다.
 - `at least once`: medication, delirium assessment 같은 point event는 bin 안에 한 번이라도 있으면 `1`, 없으면 `0`입니다.
 - `prev_delirium`: 같은 stay의 직전 12시간 bin에서의 `delirium` 결과입니다. 첫 bin은 입원 전 직전 delirium 결과가 없으므로 `0`으로 둡니다.
 - `static`: height/weight 같은 event-derived static feature는 stay 안의 첫 관측값을 전체 bin에 반복합니다. `age`, `gender`는 admission/patient 정보에서 가져옵니다.
