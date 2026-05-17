@@ -8,14 +8,16 @@ MIMIC-IV 기반 Parkinson 코호트에서 ICU 섬망 평가를 outcome으로 사
 
 1. 원천 CSV에서 ICU stay 코호트와 임상 이벤트를 추출합니다.
 2. 추출된 long-format 이벤트에 ICU 입실 기준 12시간 구간 라벨을 붙이고, charttime 기준 wide table을 생성합니다.
-3. 섬망 평가 시점마다 observation window 후보를 모델링 단계에서 집계해 assessment-level 데이터셋을 만듭니다.
+3. 12시간 bin-level table에서 subject-level train/test split과 padded LSTM sequence index를 만듭니다.
 
 ## 주요 경로
 
 - `src/1_data_extraction.ipynb`: 원천 MIMIC-IV CSV에서 cohort, chart, lab, medication, procedure 이벤트를 추출합니다.
 - `src/2_data_transform.ipynb`: 추출 결과를 숫자화, 단위 통일, 12시간 구간 라벨링, charttime 기준 wide 변환, cohort 기준 적용 산출물로 변환합니다.
 - `src/3_eda.ipynb`: transform 산출물을 읽어 환자 기본정보와 12시간 bin-level feature missingness EDA를 수행합니다.
-- `src/4_modeling.ipynb`: transform 산출물을 읽어 subject-level train/test split을 만들고 모델링 입력 준비를 시작합니다.
+- `src/4_train_test_construction.ipynb`: transform 산출물을 읽어 subject-level train/test split과 LSTM sequence index를 만듭니다.
+- `src/5_data_preprocessing.ipynb`: split 산출물과 sequence index를 읽어 LSTM tensor와 target mask를 생성합니다.
+- `src/6_modeling.ipynb`: LSTM 모델을 학습하고 masked loss/metric으로 평가합니다.
 - `src/extraction_variable_catalog.md`: 추출 대상 변수 catalog 문서입니다.
 - `src/extraction_variable_catalog.csv`: 추출 대상 변수 catalog의 CSV 버전입니다.
 - `data/`: 원천 CSV 파일 위치입니다. 민감 데이터는 git에 올리지 않습니다.
@@ -25,7 +27,8 @@ MIMIC-IV 기반 Parkinson 코호트에서 ICU 섬망 평가를 outcome으로 사
 - `docs/1_data_extraction.md`: `1_data_extraction.ipynb` 상세 설명입니다.
 - `docs/2_data_transform.md`: `2_data_transform.ipynb` 상세 설명입니다.
 - `docs/3_eda.md`: `3_eda.ipynb` 상세 설명입니다.
-- `docs/4_modeling_plan.md`: `4_modeling.ipynb` 모델링 계획입니다.
+- `docs/4_train_test_construction.md`: `4_train_test_construction.ipynb` 상세 설명입니다.
+- `docs/4_modeling_plan.md`: 모델링 단계 계획입니다.
 
 ## 실행 순서
 
@@ -33,7 +36,9 @@ MIMIC-IV 기반 Parkinson 코호트에서 ICU 섬망 평가를 outcome으로 사
 2. `1_data_extraction.ipynb`를 위에서 아래로 실행합니다.
 3. `2_data_transform.ipynb`를 위에서 아래로 실행합니다.
 4. 필요 시 `3_eda.ipynb`를 실행해 cohort EDA를 확인합니다.
-5. `4_modeling.ipynb`를 실행해 subject-level train/test split을 생성합니다.
+5. `4_train_test_construction.ipynb`를 실행해 subject-level train/test split과 LSTM sequence index를 생성합니다.
+6. `5_data_preprocessing.ipynb`를 실행해 tensor와 target mask를 생성합니다.
+7. `6_modeling.ipynb`를 실행해 masked LSTM 모델을 학습합니다.
 
 노트북은 `PROJECT_DIR = Path.cwd().resolve().parent`를 사용합니다. 따라서 현재 작업 디렉터리가 `Parkinson/src`일 때 `PROJECT_DIR`이 `Parkinson`으로 잡힙니다.
 
@@ -64,10 +69,24 @@ Parkinson/data/*.csv
        cohort_final.csv
        data_distribution_summary_12h.txt
   -> src/3_eda.ipynb
-  -> src/4_modeling.ipynb
-  -> processed/transform/
+  -> src/4_train_test_construction.ipynb
+  -> processed/modeling/
        train_subject_ids.csv
        test_subject_ids.csv
+       events_12h_binned_with_split.csv
+       cohort_final_with_split.csv
+       lstm_sequence_index.csv
+       lstm_sequence_index_train.csv
+       lstm_sequence_index_test.csv
+  -> src/5_data_preprocessing.ipynb
+  -> processed/modeling/
+       X_train_lstm.npy
+       X_test_lstm.npy
+       y_train_steps_lstm.npy
+       y_test_steps_lstm.npy
+       y_train_step_mask_lstm.npy
+       y_test_step_mask_lstm.npy
+  -> src/6_modeling.ipynb
 ```
 
 ## 코호트 기준
@@ -76,14 +95,14 @@ Parkinson/data/*.csv
 - `services.csv`를 필수 입력으로 사용하고 ICU 입실 시점의 `curr_service`를 `specialty`로 결합합니다.
 - ICU 재원시간이 양수인 stay만 유지합니다.
 - `1_data_extraction.ipynb`에서는 위 기준을 적용하지 않고 전체 ICU stay 테이블을 저장합니다.
-- `2_data_transform.ipynb`에서 ICU LOS 72시간 이상 기준을 적용하고 `cohort_attrition.csv`로 저장합니다.
+- `2_data_transform.ipynb`에서 ICU LOS 24시간 이상 기준을 적용하고 `cohort_attrition.csv`로 저장합니다.
 
 ## Outcome 정의
 
 - outcome은 `chartevents`의 `Delirium assessment`입니다.
 - transform 단계에서 `Positive`는 `1`, `Negative`는 `0`으로 변환합니다.
-- `UTA` 또는 기타 해석 불가능한 평가는 `NaN`으로 남기며 최종 assessment dataset에서는 outcome 시점으로 쓰지 않습니다.
-- charttime 기준 wide table에서 `delirium`은 12시간 `stay_id`/`bin` label입니다. 해당 bin 안 assessment 중 하나라도 positive면 `1`, assessment는 있지만 positive가 없으면 `0`, assessment 자체가 없으면 `NaN`입니다. 실제 assessment charttime의 원래 row는 long-format event와 `assessment_index_12h.csv`에서 확인합니다.
+- `UTA` 또는 기타 해석 불가능한 평가는 `NaN`으로 남깁니다.
+- train/test construction과 LSTM 모델링에서는 `events_12h_binned.csv`의 12시간 `stay_id`/`bin` label만 target으로 사용합니다. 해당 bin 안 assessment 중 하나라도 positive면 `1`, assessment는 있지만 positive가 없으면 `0`, assessment 자체가 없으면 `NaN`입니다.
 
 ## Feature 범위
 
@@ -108,16 +127,17 @@ Parkinson/data/*.csv
 
 ## 최종 데이터셋 단위
 
-`assessment_index_12h.csv`는 섬망 평가 1건을 1행으로 하는 assessment index입니다.
+모델링 입력의 기본 단위는 `lstm_sequence_index.csv`의 ICU stay별 sequence row입니다.
 
-- key: `subject_id`, `hadm_id`, `stay_id`, `charttime`, `assessment_bin`
-- outcome: `delirium`
-- subject-level label: `ever_delirium`
-- split: `4_modeling.ipynb` 실행 후 subject-level random train/test split
+- key: `example_id`, `subject_id`, `hadm_id`, `stay_id`, `anchor_bin`
+- input: `input_bins`, `input_mask`
+- output: `y_t`, `y_t_plus_1`, `y_t_plus_2`
+- loss mask: `y_t_mask`, `y_t_plus_1_mask`, `y_t_plus_2_mask`
+- split: `4_train_test_construction.ipynb` 실행 후 subject-level random train/test split
 
-Observation window별 feature 생성, 약물/procedure window-level exposure, train 기준 imputation은 모델링 단계에서 수행합니다.
+Feature selection, imputation, PAD zero-vector 변환은 `5_data_preprocessing.ipynb`에서 train 기준으로 수행합니다.
 
-기본 모델링 방향은 12시간 bin을 time step으로 쓰는 LSTM입니다. 연속 4개 time step의 feature를 입력으로 사용하고, 입력의 4번째 time step 및 다음 2개 time step의 delirium 여부를 예측합니다. ICU LOS 72시간 기준은 최소 6개 12시간 time step을 확보하기 위한 기준이며, candidate window count는 첫 48시간과 퇴실 직전 마지막 12시간을 제외한 bin 수를 기록합니다.
+기본 모델링 방향은 12시간 bin을 time step으로 쓰는 LSTM입니다. 각 stay 안에서 anchor bin을 오른쪽으로 sliding하며 sequence row를 생성합니다. 첫 anchor는 `t2`이며, PAD 3개와 `t1`만 있는 sequence는 만들지 않습니다. 최대 4개 time step의 feature를 입력으로 사용하고, 실제 input bin 수가 4개보다 적으면 왼쪽을 `PAD`로 채웁니다. 출력은 anchor bin 및 다음 2개 time step의 delirium 여부이며, 실제 target이 없는 위치는 target mask를 0으로 설정해 loss에서 제외합니다. Transform 단계 cohort inclusion은 ICU LOS 24시간 이상입니다. Candidate sequence count는 `t2`부터 마지막 bin까지의 anchor 수를 기록합니다.
 
 12시간 bin-level table에는 `prev_delirium` feature가 포함됩니다. 이는 같은 stay의 직전 bin `delirium` 결과이며 첫 bin은 `0`입니다.
 
@@ -128,7 +148,16 @@ Observation window별 feature 생성, 약물/procedure window-level exposure, tr
 - 기존 코드, 노트북 셀 구조, 문서 내용은 요청 범위에 필요한 부분만 최소 변경합니다.
 - 원천 MIMIC-IV 데이터와 산출 CSV는 민감 정보가 될 수 있으므로 git에 포함하지 않습니다.
 - 기존 notebook의 실행 순서 의존성이 강합니다. 셀을 재배치할 때는 중간 저장 파일과 변수명을 함께 확인합니다.
+- 앞선 단계에서 생성되어야 하는 파일이나 디렉터리는 존재한다고 가정합니다. `if not exist`, `mkdir(exist_ok=True)`, 누락 파일 대체 생성 같은 방어 코드는 사용하지 않습니다.
 - 앞선 notebook 셀에서 생성되어야 하는 변수나 컬럼은 뒤 셀에서 존재한다고 가정하고 그대로 사용합니다. 예: 기대 컬럼 부재를 대비하는 방어 코드는 사용하지 않습니다.
 - extraction 단계의 `adm_pat_icu.csv`는 전체 ICU stay 기준입니다. 최종 cohort는 transform 단계 산출물에, train/test split은 modeling 단계 산출물에 반영합니다.
 - notebook JSON을 수정할 때는 저장 후 `json.load`로 파일이 깨지지 않았는지 확인합니다.
 - 코드를 바꾼 뒤에는 가능하면 작은 샘플 또는 dry-run으로 산출물 컬럼이 유지되는지 확인합니다.
+
+## Windows 한글 인코딩 주의
+
+- Windows PowerShell에서 heredoc, inline script, shell redirection으로 한글 문자열을 파일에 직접 쓰지 않습니다.
+- 한글 주석이나 한글 문서를 수정할 때는 `apply_patch`를 우선 사용합니다.
+- notebook이나 JSON을 구조적으로 수정해야 해서 스크립트가 필요한 경우, 한글 literal을 스크립트 안에 직접 넣지 않거나 Unicode escape를 사용합니다.
+- 한글 수정 뒤에는 반복 물음표나 Unicode replacement character 같은 깨진 문자 여부를 확인합니다.
+- PowerShell 화면 출력은 인코딩 표시가 틀릴 수 있으므로, 실제 파일 내용은 UTF-8로 읽은 `repr` 출력 또는 JSON parse 결과로 확인합니다.

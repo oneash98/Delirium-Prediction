@@ -1,6 +1,6 @@
 # 2_data_transform.ipynb 설명
 
-`src/2_data_transform.ipynb`는 `1_data_extraction.ipynb`의 산출물을 숫자화, 단위 통일, ICU 입실 기준 12시간 구간 라벨링, charttime 기준 wide 변환, cohort 기준 적용 산출물로 변환합니다. EDA는 `src/3_eda.ipynb`, subject-level train/test split은 `src/4_modeling.ipynb`에서 수행합니다.
+`src/2_data_transform.ipynb`는 `1_data_extraction.ipynb`의 산출물을 숫자화, 단위 통일, ICU 입실 기준 12시간 구간 라벨링, charttime 기준 wide 변환, cohort 기준 적용 산출물로 변환합니다. EDA는 `src/3_eda.ipynb`, subject-level train/test split과 LSTM sequence index 생성은 `src/4_train_test_construction.ipynb`에서 수행합니다.
 
 문서 순서는 실제 노트북의 마크다운 소제목 순서를 따릅니다.
 
@@ -134,12 +134,12 @@ charttime 기준 wide table과 별도로, 12시간 bin을 row 단위로 하는 `
 
 Criteria는 12시간 라벨링과 wide table 생성 후 적용합니다.
 
-모델링은 12시간 bin을 time step으로 쓰는 LSTM 구조를 전제로 합니다. 4개 time step의 feature를 입력으로 넣고, 입력의 4번째 time step 및 그 다음 2개 time step의 delirium 여부를 예측합니다. 따라서 최소 6개 time step, 즉 72시간 ICU stay가 필요합니다.
+모델링은 12시간 bin을 time step으로 쓰는 LSTM 구조를 전제로 합니다. Transform 단계의 cohort inclusion은 ICU LOS 24시간 이상으로 적용하고, 4개 input step 및 이후 target step을 만들 수 없는 sequence는 train/test construction 단계에서 제외합니다.
 
 적용 순서:
 
 1. 전체 ICU stays from extraction
-2. 72시간 이상 ICU LOS: `icu_los_hours >= 72`
+2. 24시간 이상 ICU LOS: `icu_los_hours >= 24`
 
 12시간 window 수는 ICU LOS 기준으로 계산합니다.
 
@@ -163,11 +163,13 @@ Criteria는 12시간 라벨링과 wide table 생성 후 적용합니다.
 - `all_events_12h_binned.csv`
 - `data_distribution_summary_12h.txt`
 
-`assessment_index_12h.csv`는 섬망 평가가 실제로 시행된 시점만 모아둔 assessment-level index입니다. 각 행은 모델링 단계에서 예측 대상이 되는 평가 시점 1건이며, `assessment_bin`과 `charttime`을 기준으로 observation window를 `events_12h_wide_by_charttime.csv`에서 가져와 feature를 만들게 됩니다.
+`assessment_index_12h.csv`는 섬망 평가가 실제로 시행된 시점만 모아둔 assessment-level reference입니다. 현재 train/test construction과 LSTM 모델링은 `events_12h_binned.csv`의 bin-level `delirium` label만 사용합니다.
 
 ## 다음 단계
 
 - `3_eda.ipynb`: 환자 기본정보, delirium assessment 주기, lab 측정 주기 EDA를 수행합니다.
-- `4_modeling.ipynb`: subject-level train/test split을 만들고, 이후 observation window feature와 모델링 입력 준비를 수행합니다.
+- `4_train_test_construction.ipynb`: subject-level train/test split과 padded LSTM sequence index를 생성합니다.
+- `5_data_preprocessing.ipynb`: sequence index를 LSTM tensor와 target mask로 변환합니다.
+- `6_modeling.ipynb`: masked loss/metric 기반 LSTM 모델링을 수행합니다.
 
-모델 성능 비교에 필요한 window feature와 imputation은 `4_modeling.ipynb`의 train/test split 이후 train 기준으로 수행해야 합니다.
+모델 성능 비교에 필요한 feature selection과 imputation은 train/test split 이후 train 기준으로 수행해야 합니다.
