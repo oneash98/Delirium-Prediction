@@ -117,7 +117,7 @@ Parkinson/data/*.csv
 - chart/lab/medication event는 long-format에서 집계하지 않고 유지합니다.
 - wide table은 charttime 기준입니다. 같은 정확한 `stay_id`/`charttime`에 측정된 feature만 같은 row에 들어가며, 같은 12시간 bin 안의 여러 charttime을 `max`로 합치지 않습니다.
 - 단, wide table의 `delirium`은 12시간 bin/window label로 별도 생성합니다.
-- 별도 12시간 bin-level wide table인 `all_events_12h_binned.csv`와 cohort-filtered `events_12h_binned.csv`를 생성합니다. 이 table은 `extraction_variable_catalog.csv`의 `binning` 규칙에 따라 `aggregation`, `most recent`, `at least once`, `static` feature를 만듭니다.
+- 별도 12시간 bin-level wide table인 `all_events_12h_binned.csv`와 cohort-filtered `events_12h_binned.csv`를 생성합니다. 이 table은 `extraction_variable_catalog.csv`의 `binning` 규칙에 따라 `aggregation`, `most recent`, `at least once`, `static` feature를 만듭니다. `most recent` 변수는 직전 bin 값으로 forward fill하고 첫 bin 결측은 두 번째 bin 값으로 첫 bin만 채웁니다. `aggregation` 변수는 `count < 3`이면 `std = NaN`, 빈 bin은 직전 `latest` 하나로 `mean`/`median`/`min`/`max`/`latest`와 `count = 1`을 채우며, 첫 bin 결측은 두 번째 bin의 가장 이른 값으로 같은 방식으로 채웁니다.
 - 단위는 공통 단위로 맞춥니다. 예: Fahrenheit to Celsius, pounds to kg, FiO2 0-1 to percent.
 - 변환 rule 적용 후에도 같은 `source_table` + `feature_name` 안에 `valueuom`이 2개 이상이면 unit별 feature로 분리합니다.
 - 약물 feature는 extraction 단계에서 `all_events_long.csv`에 point event로 포함하며, 실제 투약 charttime에 `1`로 둡니다.
@@ -140,6 +140,7 @@ Feature selection, imputation, PAD zero-vector 변환은 `5_data_preprocessing.i
 기본 모델링 방향은 12시간 bin을 time step으로 쓰는 LSTM입니다. 각 stay 안에서 anchor bin을 오른쪽으로 sliding하며 sequence row를 생성합니다. 첫 anchor는 `t2`이며, PAD 3개와 `t1`만 있는 sequence는 만들지 않습니다. 최대 4개 time step의 feature를 입력으로 사용하고, 실제 input bin 수가 4개보다 적으면 왼쪽을 `PAD`로 채웁니다. 출력은 anchor bin 및 다음 2개 time step의 delirium 여부이며, 실제 target이 없는 위치는 target mask를 0으로 설정해 loss에서 제외합니다. Transform 단계 cohort inclusion은 ICU LOS 24시간 이상입니다. Candidate sequence count는 `t2`부터 마지막 bin까지의 anchor 수를 기록합니다.
 
 12시간 bin-level table에는 `prev_delirium` feature가 포함됩니다. 이는 같은 stay의 직전 bin `delirium` 결과이며 첫 bin은 `0`입니다.
+Preprocessing 단계에서는 `hours`를 현재 bin까지의 ICU 경과시간 feature로 포함하고, `race`를 categorical feature로 포함하며, 전체 ICU 재원시간인 `los_hours`는 제외합니다. `prev_delirium`은 catalog에 없는 파생 feature지만 binary feature로 포함합니다. Feature type은 `extraction_variable_catalog.csv`를 기준으로 분류하며, catalog binary/text binary, categorical, numeric feature를 분리해 처리합니다.
 
 ## 작업 시 주의사항
 
