@@ -117,7 +117,7 @@ Parkinson/data/*.csv
 - chart/lab/medication event는 long-format에서 집계하지 않고 유지합니다.
 - wide table은 charttime 기준입니다. 같은 정확한 `stay_id`/`charttime`에 측정된 feature만 같은 row에 들어가며, 같은 12시간 bin 안의 여러 charttime을 `max`로 합치지 않습니다.
 - 단, wide table의 `delirium`은 12시간 bin/window label로 별도 생성합니다.
-- 별도 12시간 bin-level wide table인 `all_events_12h_binned.csv`와 cohort-filtered `events_12h_binned.csv`를 생성합니다. 이 table은 `extraction_variable_catalog.csv`의 `binning` 규칙에 따라 `aggregation`, `most recent`, `at least once`, `static` feature를 만듭니다. `most recent` 변수는 직전 bin 값으로 forward fill하고 첫 bin 결측은 두 번째 bin 값으로 첫 bin만 채웁니다. `aggregation` 변수는 `count < 3`이면 `std = NaN`, 빈 bin은 직전 `latest` 하나로 `mean`/`median`/`min`/`max`/`latest`와 `count = 1`을 채우며, 첫 bin 결측은 두 번째 bin의 가장 이른 값으로 같은 방식으로 채웁니다.
+- 별도 12시간 bin-level wide table인 `all_events_12h_binned.csv`와 cohort-filtered `events_12h_binned.csv`를 생성합니다. 이 table은 `extraction_variable_catalog.csv`의 `binning` 규칙에 따라 `aggregation`, `most recent`, `at least once`, `static` feature를 만듭니다. `most recent` 변수는 해당 bin에 값이 없을 때 직전 bin의 최신값만 사용하고, 직전 bin도 비어있으면 결측으로 둡니다. 첫 bin 결측은 두 번째 bin 최신값으로 채웁니다. `ammonia`는 별도 `ammonia_measured` 컬럼으로 해당 bin 내 실제 측정 존재 여부를 0/1로 표시합니다. `aggregation` 변수는 `count < 3`이면 `std = 0`, 빈 bin은 직전 bin의 `latest` 하나로 `mean`/`median`/`min`/`max`/`latest`를 채우고 `count = 0`, `std = 0`으로 두며, 직전 bin도 비어있으면 결측으로 둡니다. 첫 bin 결측은 두 번째 bin의 `latest`로 값 요약을 채우고 `count = 0`, `std = 0`으로 둡니다.
 - 단위는 공통 단위로 맞춥니다. 예: Fahrenheit to Celsius, pounds to kg, FiO2 0-1 to percent.
 - 변환 rule 적용 후에도 같은 `source_table` + `feature_name` 안에 `valueuom`이 2개 이상이면 unit별 feature로 분리합니다.
 - 약물 feature는 extraction 단계에서 `all_events_long.csv`에 point event로 포함하며, 실제 투약 charttime에 `1`로 둡니다.
