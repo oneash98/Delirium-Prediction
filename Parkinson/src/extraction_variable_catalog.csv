@@ -203,7 +203,5 @@ emar,,,Vasopressin,vasopressor,,binary,positive(1)  if  the observation window o
 emar,,,DOBUTamine,vasopressor,,binary,positive(1)  if  the observation window overlaps the charttime,at least once
 emar,,,PHENYLephrine,vasopressor,,binary,positive(1)  if  the observation window overlaps the charttime,at least once
 emar,,,PHENYLEPHrine,vasopressor,,binary,positive(1)  if  the observation window overlaps the charttime,at least once
-emar,,,Phenylephrine 2.5 % Ophth Soln,vasopressor,,binary,positive(1)  if  the observation window overlaps the charttime,at least once
-emar,,,PHENYLEPHrinePhenylephrine 10 % Ophth Soln,vasopressor,,binary,positive(1)  if  the observation window overlaps the charttime,at least once
 emar,,,NORepinephrine,vasopressor,,binary,positive(1)  if  the observation window overlaps the charttime,at least once
 emar,,,Norepinephrine,vasopressor,,binary,positive(1)  if  the observation window overlaps the charttime,at least once
