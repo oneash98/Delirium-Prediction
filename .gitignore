@@ -10,6 +10,7 @@ YonseiAIChallenge/models/optuna/
 data/
 Parkinson/processed/
 Parkinson/outputs/
+Parkinson/models/
 .Ds_Store
 .obsidian
 test*

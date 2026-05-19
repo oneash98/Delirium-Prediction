@@ -52,7 +52,7 @@ labevents,52024,blood gas,"Creatinine, Whole Blood",creatinine,mg/dL,numeric,,mo
 chartevents,229761,,Creatinine (whole blood),creatinine,mg/dL,numeric,,most recent,1
 labevents,50960,blood chemistry,Magnesium,magnesium,mg/dL,numeric,,most recent,1
 chartevents,220635,,Magnesium,magnesium,mg/dL,numeric,,most recent,1
-labevents,50970,blood chemistry,Phosphate,phosphate,mg/dL,numeric,,most recent,1
+labevents,50970,blood chemistry,Phosphate,phosphate,mg/dL,numeric,,most recent,0
 labevents,50862,blood chemistry,Albumin,albumin,g/dL,numeric,,most recent,0
 labevents,50813,blood chemistry,Lactate,lactate,mmol/L,numeric,,most recent,0
 labevents,50861,blood chemistry,Alanine Aminotransferase (ALT),alt,IU/L,numeric,,most recent,0

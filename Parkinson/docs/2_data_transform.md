@@ -58,6 +58,14 @@ wide table에서 `delirium`의 `NaN`은 단순 feature 결측이 아니라 해�
 - 같은 stay 안의 연속 assessment 간격을 시간 단위로 계산합니다.
 - 전체 mean/median 및 stay-level interval 요약을 출력합니다.
 
+## 12시간 binning 전 이상치 처리
+
+12시간 구간 라벨을 붙이기 전에 명백한 입력 오류로 보이는 numeric 이상치를 같은 `stay_id`/`feature_name` 안의 이전 정상 측정값으로 대체합니다. 이전 정상 측정값이 없으면 결측으로 둡니다.
+
+- `spo2`, `sao2`: 0 미만 또는 100 초과
+- `temperature`: 30 미만 또는 43 초과
+- 그 외 `type == "numeric"` 변수: 0 미만
+
 ## 시간 계산 (ICU 입실 기준)
 
 `adm_pat_icu`의 ICU 입실/퇴실 정보를 붙이고, ICU 입실 후 실제 경과시간으로 12시간 구간 라벨을 만듭니다.
@@ -125,10 +133,10 @@ charttime 기준 wide table과 별도로, 12시간 bin을 row 단위로 하는 `
 - 기본 정보로 `age`, `gender`, `los_hours`, `admission_type`, `race`, `specialty`, `hospital_expire_flag`, `intime`, `outtime`을 가능한 컬럼 범위에서 유지합니다.
 - `aggregation`: 같은 stay/bin/feature 안의 numeric value로 `mean`, `median`, `std`, `count`, `min`, `max`, `latest` 컬럼을 만듭니다. 컬럼명은 `{feature}_{stat}` 형식입니다.
   - 해당 bin의 측정 횟수 `count < 3`이면 `std`는 `0`으로 둡니다.
-  - 해당 bin에 측정값이 없고 같은 stay의 직전 관측 `latest`가 있으면, 그 직전 `latest` 하나로 `mean`, `median`, `min`, `max`, `latest`를 채우고 `count = 0`, `std = 0`으로 둡니다.
-  - 직전 bin도 비어있으면 결측으로 둡니다.
-  - 첫 번째 bin에 측정값이 없고 두 번째 bin의 `latest`가 있으면, 두 번째 bin의 `latest`로 `mean`, `median`, `min`, `max`, `latest`를 채우고 `count = 0`, `std = 0`으로 둡니다.
-- `most recent`: 각 bin 안의 최신값을 사용합니다. 해당 bin에 측정값이 없고 직전 bin의 최신값이 있으면 그 값을 사용합니다. 직전 bin도 비어있으면 결측으로 둡니다. 첫 번째 bin에 값이 없고 두 번째 bin의 최신값이 있으면, 두 번째 bin의 최신값으로 첫 번째 bin을 채웁니다.
+  - 해당 bin에 측정값이 없으면 같은 stay에서 이전에 관측된 가장 최근 `latest` 하나로 `mean`, `median`, `min`, `max`, `latest`를 채우고 `count = 0`, `std = 0`으로 둡니다.
+  - 이전 어느 bin에도 관측값이 없으면 `count = 0`, `std = 0`으로 두고 나머지 요약값은 결측으로 둡니다.
+  - 첫 번째 bin에 측정값이 없고 두 번째 bin의 `latest`가 있으면, 두 번째 bin의 `latest`로 `mean`, `median`, `min`, `max`, `latest`를 채우고 `count = 0`, `std = 0`으로 둡니다. 두 번째 bin도 비어있으면 `count = 0`, `std = 0`만 채웁니다.
+- `most recent`: 각 bin 종료 시점 기준 가장 최근 측정값을 사용합니다. 해당 bin에 측정값이 없으면 같은 stay에서 이전에 관측된 가장 최근값을 사용합니다. 첫 번째 bin에 값이 없고 두 번째 bin의 최신값이 있으면, 두 번째 bin의 최신값으로 첫 번째 bin을 채웁니다. 두 번째 bin도 없으면 결측으로 둡니다.
   - `ammonia`는 값 컬럼과 별도로 `ammonia_measured` 컬럼을 추가합니다. 해당 12시간 bin 안에 실제 ammonia 측정값이 있으면 `1`, 없으면 `0`입니다.
 - `at least once`: medication, delirium assessment 같은 point event는 bin 안에 한 번이라도 있으면 `1`, 없으면 `0`입니다.
 - `prev_delirium`: 같은 stay의 직전 12시간 bin에서의 `delirium` 결과입니다. 첫 bin은 입원 전 직전 delirium 결과가 없으므로 `0`으로 둡니다.

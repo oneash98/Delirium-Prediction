@@ -28,7 +28,7 @@ MIMIC-IV 기반 Parkinson 코호트에서 ICU 섬망 평가를 outcome으로 사
 - `docs/2_data_transform.md`: `2_data_transform.ipynb` 상세 설명입니다.
 - `docs/3_eda.md`: `3_eda.ipynb` 상세 설명입니다.
 - `docs/4_train_test_construction.md`: `4_train_test_construction.ipynb` 상세 설명입니다.
-- `docs/4_modeling_plan.md`: 모델링 단계 계획입니다.
+- `docs/6_modeling.md`: `6_modeling.ipynb` 상세 설명입니다.
 
 ## 실행 순서
 
@@ -40,7 +40,7 @@ MIMIC-IV 기반 Parkinson 코호트에서 ICU 섬망 평가를 outcome으로 사
 6. `5_data_preprocessing.ipynb`를 실행해 tensor와 target mask를 생성합니다.
 7. `6_modeling.ipynb`를 실행해 masked LSTM 모델을 학습합니다.
 
-노트북은 `PROJECT_DIR = Path.cwd().resolve().parent`를 사용합니다. 따라서 현재 작업 디렉터리가 `Parkinson/src`일 때 `PROJECT_DIR`이 `Parkinson`으로 잡힙니다.
+노트북은 실행 위치가 `Parkinson/src`, `Parkinson`, repository root 중 어디인지 확인해 `PROJECT_DIR`을 설정합니다. 따라서 Jupyter를 `Parkinson/src`에서 열어도 되고, repository root에서 열어도 `Parkinson/processed/modeling` 같은 하위 경로를 찾을 수 있습니다.
 
 ## 데이터 흐름
 
@@ -82,11 +82,23 @@ Parkinson/data/*.csv
   -> processed/modeling/
        X_train_lstm.npy
        X_test_lstm.npy
+       y_train_lstm.npy
+       y_test_lstm.npy
        y_train_steps_lstm.npy
        y_test_steps_lstm.npy
        y_train_step_mask_lstm.npy
        y_test_step_mask_lstm.npy
+       lstm_train_metadata.csv
+       lstm_test_metadata.csv
   -> src/6_modeling.ipynb
+  -> outputs/modeling/
+       lstm_tuning_results.csv
+       lstm_test_metrics.csv
+       lstm_test_metrics_by_horizon.csv
+       lstm_test_predictions.csv
+  -> models/
+       lstm_best_model.pt
+       lstm_best_model_config.json
 ```
 
 ## 코호트 기준
@@ -117,13 +129,14 @@ Parkinson/data/*.csv
 - chart/lab/medication event는 long-format에서 집계하지 않고 유지합니다.
 - wide table은 charttime 기준입니다. 같은 정확한 `stay_id`/`charttime`에 측정된 feature만 같은 row에 들어가며, 같은 12시간 bin 안의 여러 charttime을 `max`로 합치지 않습니다.
 - 단, wide table의 `delirium`은 12시간 bin/window label로 별도 생성합니다.
-- 별도 12시간 bin-level wide table인 `all_events_12h_binned.csv`와 cohort-filtered `events_12h_binned.csv`를 생성합니다. 이 table은 `extraction_variable_catalog.csv`의 `binning` 규칙에 따라 `aggregation`, `most recent`, `at least once`, `static` feature를 만듭니다. `most recent` 변수는 해당 bin에 값이 없을 때 직전 bin의 최신값만 사용하고, 직전 bin도 비어있으면 결측으로 둡니다. 첫 bin 결측은 두 번째 bin 최신값으로 채웁니다. `ammonia`는 별도 `ammonia_measured` 컬럼으로 해당 bin 내 실제 측정 존재 여부를 0/1로 표시합니다. `aggregation` 변수는 `count < 3`이면 `std = 0`, 빈 bin은 직전 bin의 `latest` 하나로 `mean`/`median`/`min`/`max`/`latest`를 채우고 `count = 0`, `std = 0`으로 두며, 직전 bin도 비어있으면 결측으로 둡니다. 첫 bin 결측은 두 번째 bin의 `latest`로 값 요약을 채우고 `count = 0`, `std = 0`으로 둡니다.
+- 12시간 라벨링 전, 명백한 numeric 이상치는 같은 `stay_id`/`feature_name` 안의 이전 정상 측정값으로 대체합니다. `spo2`/`sao2`는 0 미만 또는 100 초과, `temperature`는 30 미만 또는 43 초과, 그 외 `type == "numeric"` 변수는 음수일 때 이상치로 봅니다. 이전 정상값이 없으면 결측으로 둡니다.
+- 별도 12시간 bin-level wide table인 `all_events_12h_binned.csv`와 cohort-filtered `events_12h_binned.csv`를 생성합니다. 이 table은 `extraction_variable_catalog.csv`의 `binning` 규칙에 따라 `aggregation`, `most recent`, `at least once`, `static` feature를 만듭니다. `most recent` 변수는 각 bin 종료 시점 기준 가장 최근 측정값을 사용하며, 해당 bin에 값이 없으면 같은 stay에서 이전에 관측된 가장 최근값을 사용합니다. 첫 bin 결측은 두 번째 bin 최신값으로 채우고, 두 번째 bin도 없으면 결측으로 둡니다. `ammonia`는 별도 `ammonia_measured` 컬럼으로 해당 bin 내 실제 측정 존재 여부를 0/1로 표시합니다. `aggregation` 변수는 bin 안에서 `mean`/`median`/`std`/`count`/`min`/`max`/`latest`를 만들고, `count < 3`이면 `std = 0`으로 둡니다. 빈 bin은 같은 stay에서 이전에 관측된 가장 최근 `latest` 하나로 `mean`/`median`/`min`/`max`/`latest`를 채우고 `count = 0`, `std = 0`으로 둡니다. 첫 bin 결측은 두 번째 bin의 `latest`로 값 요약을 채우고 `count = 0`, `std = 0`으로 두며, 두 번째 bin도 없으면 `count = 0`, `std = 0`만 채웁니다.
 - 단위는 공통 단위로 맞춥니다. 예: Fahrenheit to Celsius, pounds to kg, FiO2 0-1 to percent.
 - 변환 rule 적용 후에도 같은 `source_table` + `feature_name` 안에 `valueuom`이 2개 이상이면 unit별 feature로 분리합니다.
 - 약물 feature는 extraction 단계에서 `all_events_long.csv`에 point event로 포함하며, 실제 투약 charttime에 `1`로 둡니다.
 - 처치/장치는 long event row로 만들지 않습니다. charttime 기준 wide table에서는 현재 row의 `charttime`이 interval 안에 들어오면 `1`, 12시간 bin-level table에서는 procedure interval이 bin과 겹치면 `1`로 표시합니다.
 - 체중/키는 wide table에서 stay 안의 첫 측정값으로 전체 charttime row를 채웁니다.
-- 활력징후, Lab, neuro 변수는 transform 단계에서 시간별 보간하지 않습니다.
+- charttime 기준 wide table에서는 활력징후, Lab, neuro 변수를 시간별 보간하지 않습니다. 12시간 bin-level table에서는 catalog의 `binning` 규칙에 따라 이전 관측 최신값을 사용하는 ffill 규칙을 적용합니다.
 
 ## 최종 데이터셋 단위
 

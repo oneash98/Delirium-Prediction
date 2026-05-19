@@ -4,7 +4,7 @@
 
 ## 입력 파일
 
-`processed/data_split/`:
+`processed/modeling/`:
 
 - `events_12h_binned_with_split.csv`
 - `lstm_sequence_index_train.csv`
@@ -37,9 +37,12 @@ Catalog의 `feature_name`과 정확히 일치하는 binary/categorical 변수만
 
 ## Preprocessing 규칙
 
-- train split 기준으로만 missingness, median, mean, std, category level을 fit
-- numeric feature: train median imputation 후 train mean/std scaling
-- numeric high-missing feature: train missing rate가 `MISSING_THRESHOLD` 초과면 제외
+- train split 기준으로만 missingness, imputation 값, scaling 값, category level을 fit
+- 결측치가 심한 변수는 명시 목록 기준으로 `binned`에서 실제 제거
+- numeric feature: train 기준 imputation 후 `StandardScaler` 적용
+- lab/most recent numeric feature: 해당 컬럼의 train median으로 imputation
+- aggregation numeric feature: `{feature}_mean`, `{feature}_median`, `{feature}_min`, `{feature}_max`, `{feature}_latest`는 같은 feature의 `{feature}_latest` train median으로 imputation
+- aggregation의 `{feature}_count`, `{feature}_std` 및 기타 numeric feature: 해당 컬럼의 train median으로 imputation
 - numeric binary feature: `0/1` 그대로 사용, missing은 `0`
 - text binary feature: train level 기준 one-hot
 - categorical feature: train level 기준 one-hot
@@ -51,12 +54,15 @@ Catalog의 `feature_name`과 정확히 일치하는 binary/categorical 변수만
 
 - `PAD` input step: zero-vector
 - 실제 input bin: `(stay_id, bin)` 기준 feature row lookup
+- sequence 1개: `input_bins`의 각 time step을 feature vector로 바꾼 `(time, feature)` matrix
+- 전체 input tensor: sequence별 matrix를 쌓은 `(sequence, time, feature)` array
 - target: `y_t`, `y_t_plus_1`, `y_t_plus_2`
 - target mask: `y_t_mask`, `y_t_plus_1_mask`, `y_t_plus_2_mask`
+- binary target: `y_t`, `y_t_plus_1`, `y_t_plus_2` 중 하나라도 positive인 `y_any_t_to_t_plus_2`
 
 ## 출력 파일
 
-`processed/data_split/`:
+`processed/modeling/`:
 
 - `X_train_lstm.npy`
 - `X_test_lstm.npy`
@@ -72,7 +78,7 @@ Catalog의 `feature_name`과 정확히 일치하는 binary/categorical 변수만
 - `feature_missingness_test.csv`
 - `lstm_preprocessing_summary.csv`
 
-`models/clean_data/`:
+`models/preprocess/`:
 
 - `lstm_feature_columns.json`
 - `lstm_preprocess_params.json`
