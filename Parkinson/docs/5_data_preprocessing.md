@@ -4,7 +4,7 @@
 
 ## 입력 파일
 
-`processed/modeling/`:
+`processed/data_split/`:
 
 - `events_12h_binned_with_split.csv`
 - `lstm_sequence_index_train.csv`
@@ -58,11 +58,11 @@ Catalog의 `feature_name`과 정확히 일치하는 binary/categorical 변수만
 - 전체 input tensor: sequence별 matrix를 쌓은 `(sequence, time, feature)` array
 - target: `y_t`, `y_t_plus_1`, `y_t_plus_2`
 - target mask: `y_t_mask`, `y_t_plus_1_mask`, `y_t_plus_2_mask`
-- binary target: `y_t`, `y_t_plus_1`, `y_t_plus_2` 중 하나라도 positive인 `y_any_t_to_t_plus_2`
+- binary target: `y_t`, `y_t_plus_1`, `y_t_plus_2` 중 하나라도 positive인 `y_within_t_plus_2`; metadata에는 `y_within_t_plus_1`도 함께 저장
 
 ## 출력 파일
 
-`processed/modeling/`:
+`processed/data_split/`:
 
 - `X_train_lstm.npy`
 - `X_test_lstm.npy`
@@ -78,7 +78,7 @@ Catalog의 `feature_name`과 정확히 일치하는 binary/categorical 변수만
 - `feature_missingness_test.csv`
 - `lstm_preprocessing_summary.csv`
 
-`models/preprocess/`:
+`models/clean_data/`:
 
 - `lstm_feature_columns.json`
 - `lstm_preprocess_params.json`

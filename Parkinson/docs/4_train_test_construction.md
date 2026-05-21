@@ -70,13 +70,14 @@ target:
 - `y_t_mask`
 - `y_t_plus_1_mask`
 - `y_t_plus_2_mask`
-- `y_any_t_to_t_plus_2`
+- `y_within_t_plus_1`
+- `y_within_t_plus_2`
 
 `PAD` target의 label은 placeholder `0`입니다. 실제 loss와 metric은 mask 1 위치만 사용합니다.
 
 ## 출력 파일
 
-`processed/modeling/`:
+`processed/data_split/`:
 
 - `events_12h_binned_with_split.csv`
 - `cohort_final_with_split.csv`

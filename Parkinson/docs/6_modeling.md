@@ -1,17 +1,17 @@
 # 6_modeling
 
-`src/6_modeling.ipynb`는 `5_data_preprocessing.ipynb`에서 생성한 LSTM tensor를 사용해 multi-output LSTM을 학습하고, masked loss/metric으로 검증 및 test 평가를 수행합니다.
+`src/6_modeling.ipynb`는 `5_data_preprocessing.ipynb`에서 생성한 LSTM tensor를 사용해 encoder-decoder multi-horizon LSTM을 학습하고, masked loss/metric으로 검증 및 test 평가를 수행합니다.
 
-노트북은 주피터에서 위에서 아래로 한 셀씩 실행하는 흐름을 전제로 구성합니다. 각 단계는 준비, 로딩, validation split, 모델/평가 함수 정의, hyperparameter tuning, test 평가, 결과 저장 순서입니다.
+노트북은 주피터에서 위에서 아래로 한 셀씩 실행하는 흐름을 전제로 구성합니다. 각 단계는 준비, 로딩, subject-level CV 구성, 모델/평가 함수 정의, hyperparameter tuning, 전체 train 재학습, test 평가, 결과 저장 순서입니다.
 
 ## 입력 파일
 
-`processed/modeling/`:
+`processed/data_split/`:
 
 - `X_train_lstm.npy`: train LSTM 입력 tensor, shape `(sequence, time, feature)`.
 - `X_test_lstm.npy`: test LSTM 입력 tensor.
-- `y_train_lstm.npy`: train any-event target.
-- `y_test_lstm.npy`: test any-event target.
+- `y_train_lstm.npy`: train `within_t_plus_2` target.
+- `y_test_lstm.npy`: test `within_t_plus_2` target.
 - `y_train_steps_lstm.npy`: train horizon별 target, columns `y_t`, `y_t_plus_1`, `y_t_plus_2`.
 - `y_test_steps_lstm.npy`: test horizon별 target.
 - `y_train_step_mask_lstm.npy`: train horizon별 평가 가능 여부 mask.
@@ -23,10 +23,10 @@
 
 1. 실행 준비: library import, 난수 고정, 경로 설정, PyTorch device 선택.
 2. 전처리 산출물 로딩: LSTM tensor, target, mask, metadata 로딩과 기본 분포 확인.
-3. Subject-level validation split: train set 내부에서 `subject_id` 기준 validation set 분리.
+3. Subject-level cross-validation split: train set 내부에서 `subject_id` 기준 K-fold CV 구성.
 4. 모델과 평가 함수 정의: LSTM class, DataLoader, metric, prediction 함수 정의.
-5. Hyperparameter tuning: validation macro AUPRC 기준 best trial 선택.
-6. Best model test 평가: best checkpoint로 test set metric과 prediction 생성.
+5. Hyperparameter tuning: Optuna로 CV 평균 macro AUPRC 기준 best trial 선택.
+6. Best parameter 전체 train 재학습과 test 평가: 선택된 best parameter로 전체 train set을 다시 학습한 뒤 test set metric과 prediction 생성.
 7. 결과 저장: tuning 결과, test metric, prediction, model checkpoint, config 저장.
 
 ## 경로 설정
@@ -37,27 +37,28 @@
 - `Parkinson`
 - repository root
 
-따라서 Jupyter를 `Parkinson/src`에서 열어도 되고, repository root에서 열어도 `Parkinson/processed/modeling`을 찾을 수 있습니다.
+따라서 Jupyter를 `Parkinson/src`, `Parkinson`, repository root 중 어디에서 열어도 `Parkinson/processed/data_split`을 찾을 수 있습니다.
 
-## Validation Split
+## Cross-Validation Split
 
-`6_modeling.ipynb`는 이미 만들어진 train/test split을 바꾸지 않습니다. 대신 hyperparameter tuning을 위해 train split 안에서만 validation split을 새로 만듭니다.
+`6_modeling.ipynb`는 이미 만들어진 train/test split을 바꾸지 않습니다. 대신 hyperparameter tuning을 위해 train split 안에서만 subject-level K-fold CV를 수행합니다.
 
 - 분리 단위: `subject_id`
-- validation 비율: `VAL_SIZE = 0.20`
-- stratification 기준: subject별 `y_any` 최대값
-- 목적: 같은 환자의 sequence가 inner train과 validation에 동시에 들어가는 leakage 방지
+- fold 수: `N_FOLDS = 5`
+- stratification 기준: subject별 `y_within_t_plus_2` 최대값
+- 목적: 같은 환자의 sequence가 fold train과 validation fold에 동시에 들어가는 leakage 방지
 
 ## 모델 구조
 
-기본 모델은 multi-output LSTM입니다.
+기본 모델은 encoder-decoder multi-horizon LSTM입니다.
 
 - 입력: 4개 12시간 time step의 feature tensor
-- LSTM 출력: 마지막 hidden state
-- classifier 출력: 3개 logit
+- encoder: `t-3`부터 `t`까지의 input sequence를 읽고 마지막 hidden/cell state를 생성
+- decoder: 미래 observed feature 없이 horizon embedding sequence를 입력받아 `y_t`, `y_t_plus_1`, `y_t_plus_2` logit을 순차 생성
+- classifier 출력: horizon별 1개 logit, 최종 shape `(batch, 3)`
 - output horizon: `y_t`, `y_t_plus_1`, `y_t_plus_2`
 
-`num_layers == 1`이면 PyTorch LSTM 내부 dropout은 적용하지 않고, 마지막 hidden state 뒤의 classifier dropout만 적용합니다.
+`num_layers == 1`이면 PyTorch LSTM 내부 dropout은 적용하지 않고, decoder output 뒤의 classifier dropout만 적용합니다.
 
 ## Loss와 Mask 처리
 
@@ -66,7 +67,7 @@
 - `target_mask = 1`: 실제 target이 존재하는 horizon, loss와 metric에 포함
 - `target_mask = 0`: 실제 target이 없는 horizon, loss와 horizon별 metric에서 제외
 
-Class imbalance 보정을 위해 horizon별 `pos_weight`를 inner train target 기준으로 계산합니다.
+Class imbalance 보정을 위해 horizon별 `pos_weight`를 각 fold의 train target 기준으로 계산합니다. 최종 test용 전체 train 재학습에서는 전체 train target 기준으로 다시 계산합니다.
 
 ## 평가 지표
 
@@ -85,20 +86,26 @@ Summary metric:
 
 - `macro_auroc`: horizon별 AUROC 평균
 - `macro_auprc`: horizon별 AUPRC 평균
-- `any_*`: 3개 horizon 중 하나라도 양성인 any-event 기준 metric
+- `within_t_plus_1_*`: `t~t+1` 중 하나라도 양성인 window 기준 metric
+- `within_t_plus_2_*`: `t~t+2` 중 하나라도 양성인 window 기준 metric
 
-Hyperparameter tuning의 선택 기준은 `macro_auprc`입니다. Class imbalance가 있는 outcome이므로 AUPRC를 주요 기준으로 사용합니다.
+Hyperparameter tuning의 선택 기준은 fold별 `macro_auprc`의 CV 평균입니다. Class imbalance가 있는 outcome이므로 AUPRC를 주요 기준으로 사용합니다.
 
 ## Hyperparameter Tuning
 
-현재 grid:
+Optuna 설정:
 
-- `hidden_size`: 32, 64
-- `num_layers`: 1, 2
-- `dropout`: 0.0, 0.2
-- `lr`: 1e-3
-- `batch_size`: 64
-- `weight_decay`: 1e-4
+- `N_TRIALS = 30`
+- sampler: `TPESampler(seed=RANDOM_STATE)`
+
+탐색 공간:
+
+- `hidden_size`: 32, 64, 128, 256
+- `num_layers`: 1-3
+- `dropout`: 0.0-0.5
+- `lr`: 1e-4-3e-3, log scale
+- `batch_size`: 32, 64, 128
+- `weight_decay`: 1e-6-1e-3, log scale
 
 학습 설정:
 
@@ -106,38 +113,49 @@ Hyperparameter tuning의 선택 기준은 `macro_auprc`입니다. Class imbalanc
 - `PATIENCE = 5`
 - optimizer: AdamW
 - gradient clipping: max norm 5.0
-- best checkpoint 기준: validation `macro_auprc`
+- fold별 best checkpoint 기준: validation fold `macro_auprc`
+- 최종 모델: best parameter로 전체 train set을 CV 평균 best epoch만큼 재학습
 
 ## 출력 파일
 
 `outputs/modeling/`:
 
-- `lstm_tuning_results.csv`: hyperparameter trial별 validation metric.
-- `lstm_test_metrics.csv`: best model test summary metric.
-- `lstm_test_metrics_by_horizon.csv`: best model test horizon별 metric.
-- `lstm_test_predictions.csv`: test sequence별 true label, mask, probability, threshold 0.5 prediction.
+- `lstm_gpu_tuning_results.csv`: Optuna trial별 CV 평균/표준편차 metric.
+- `lstm_gpu_optuna_trials.csv`: Optuna trial summary와 parameter.
+- `lstm_gpu_cv_fold_metrics.csv`: trial/fold별 validation fold summary metric.
+- `lstm_gpu_cv_fold_metrics_by_horizon.csv`: trial/fold별 validation fold horizon metric.
+- `lstm_gpu_cv_fold_history.csv`: trial/fold/epoch별 train loss와 validation summary metric.
+- `lstm_gpu_test_metrics.csv`: best parameter로 재학습한 최종 model의 test summary metric.
+- `lstm_gpu_test_metrics_by_horizon.csv`: best parameter로 재학습한 최종 model의 test horizon별 metric.
+- `lstm_gpu_test_predictions.csv`: test sequence별 true label, mask, probability, threshold 0.5 prediction.
+- `figures/lstm_final_train_loss.png`: 최종 전체 train 재학습의 train loss curve.
+- `figures/lstm_best_trial_cv_macro_auprc.png`: best trial의 fold별 validation macro AUPRC curve와 epoch별 CV 평균 curve.
+- `figures/lstm_test_horizon_auprc_auroc.png`: test set horizon별 AUPRC/AUROC bar plot.
 
 `models/`:
 
-- `lstm_best_model.pt`: model state dict, parameters, validation/test metric이 포함된 PyTorch payload.
-- `lstm_best_model_config.json`: best model 설정과 평가 결과 요약.
+- `lstm_best_model_gpu.pt`: model state dict, parameters, CV/test metric이 포함된 PyTorch payload.
+- `lstm_best_model_gpu_config.json`: best model 설정과 평가 결과 요약.
 
 ## QA 체크
 
 노트북 실행 중 확인하는 항목입니다.
 
 - train/test input tensor shape
-- train/test any-event positive rate
+- train/test `within_t_plus_1`, `within_t_plus_2` positive rate
 - horizon별 evaluable target 수
 - horizon별 masked positive rate
 - train/test input NaN 개수
-- inner train/validation sequence 수와 subject 수
-- validation horizon별 positive rate
-- tuning trial별 핵심 metric
+- CV fold별 train/validation sequence 수와 subject 수
+- CV fold별 validation horizon positive rate
+- Optuna trial별 CV 평균 핵심 metric
+- 최종 train loss curve
+- best trial의 CV validation macro AUPRC curve
+- test horizon별 AUPRC/AUROC bar plot
 - 최종 test summary metric과 horizon별 metric
 
 ## 주의 사항
 
-- `best_artifact`는 tuning 셀 실행 후 생성됩니다. test 평가 섹션은 tuning 완료 후 실행해야 합니다.
+- `best_trial`은 tuning 셀 실행 후 생성됩니다. test 평가 섹션은 tuning 완료 후 실행해야 합니다.
 - Notebook output은 재현성을 위해 저장하지 않습니다. 필요한 결과는 CSV, `.pt`, `.json` 파일로 저장합니다.
 - Test set은 hyperparameter 선택에 사용하지 않고, best model 선택 후 최종 평가에만 사용합니다.
