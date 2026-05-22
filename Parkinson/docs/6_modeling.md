@@ -1,5 +1,46 @@
 # 6_modeling
 
+## Within t+2 비교 모델 추가
+
+`src/6_modeling_within_t_plus_2.ipynb`는 기존 전처리 산출물(`processed/data_split/`)을 그대로 사용해 비교용 ML baseline과 single-output LSTM을 학습합니다. 재사용 가능한 함수와 CLI 실행용 코드는 `src/6_modeling_within_t_plus_2.py`에 함께 둡니다.
+
+- ML/deep learning baseline: LR, RF, XGB, LightGBM, MLP
+- ML input: `X_*_lstm.npy[:, -1, :]`, 즉 anchor `t` 시점 feature만 사용
+- ML target: `y_*_lstm.npy`, 즉 `t`, `t+1`, `t+2` 중 delirium 발생 여부
+- target window: binary within target에는 horizon별 mask가 없으므로 기본값은 `target_available_count >= 3`인 full `t~t+2` window만 사용
+- LSTM input: 기존과 동일하게 `t-3~t` 4개 time step
+- LSTM output: encoder-decoder horizon 3개 출력이 아니라 `within_t_plus_2` binary logit 1개
+- CV: 기존과 동일하게 train split 내부 subject-level K-fold
+- tuning objective: CV 평균 AUPRC
+- GPU: PyTorch MLP/LSTM은 CUDA 사용, XGB/LightGBM은 CUDA가 보이면 GPU parameter를 우선 사용
+
+실행 예시:
+
+```bash
+Parkinson/src/6_modeling_within_t_plus_2.ipynb
+```
+
+빠른 smoke test:
+
+```bash
+python Parkinson/src/6_modeling_within_t_plus_2.py --models LR MLP LSTM --n-folds 2 --n-trials-ml 1 --n-trials-mlp 1 --n-trials-lstm 1 --max-epochs 1
+```
+
+기존 masked multi-horizon 노트북처럼 마지막 bin 근처의 partial target window까지 포함하려면 `--allow-partial-target-window`를 추가합니다.
+
+XGB/LightGBM이 없는 환경에서는 해당 모델만 skip됩니다. 필요한 패키지는 `Parkinson/requirements-modeling.txt`에 정리했습니다.
+
+주요 출력:
+
+- `outputs/modeling/within_t_plus_2/*_t_point_tuning_results.csv`
+- `outputs/modeling/within_t_plus_2/*_t_point_test_metrics.csv`
+- `outputs/modeling/within_t_plus_2/mlp_t_point_test_metrics.csv`
+- `outputs/modeling/within_t_plus_2/lstm_within_t_plus_2_tuning_results.csv`
+- `outputs/modeling/within_t_plus_2/lstm_within_t_plus_2_test_metrics.csv`
+- `outputs/modeling/within_t_plus_2/within_t_plus_2_test_metrics_summary.csv`
+- `models/within_t_plus_2/*_t_point_within_t_plus_2.joblib`
+- `models/within_t_plus_2/lstm_within_t_plus_2_best_model.pt`
+
 `src/6_modeling.ipynb`는 `5_data_preprocessing.ipynb`에서 생성한 LSTM tensor를 사용해 encoder-decoder multi-horizon LSTM을 학습하고, masked loss/metric으로 검증 및 test 평가를 수행합니다.
 
 노트북은 주피터에서 위에서 아래로 한 셀씩 실행하는 흐름을 전제로 구성합니다. 각 단계는 준비, 로딩, subject-level CV 구성, 모델/평가 함수 정의, hyperparameter tuning, 전체 train 재학습, test 평가, 결과 저장 순서입니다.
