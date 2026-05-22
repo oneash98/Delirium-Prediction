@@ -27,7 +27,7 @@
 
 - Permutation feature importance: 각 feature의 `t-3~t` trajectory 전체를 sequence 사이에서 섞고, `within_t_plus_2` AUPRC 감소량을 중요도로 사용합니다.
 - Permutation time-step importance: `t-3`, `t-2`, `t-1`, `t` 각 time step의 전체 feature vector를 sequence 사이에서 섞고 AUPRC 감소량을 계산합니다.
-- Optional SHAP: `RUN_SHAP = True`이고 `shap` package가 설치된 경우 선택 horizon logit에 대해 SHAP feature importance를 계산합니다.
+- SHAP: `RUN_SHAP = True`로 설정한 경우 선택 horizon logit에 대해 SHAP feature importance를 계산합니다.
 
 ## 출력 파일
 
@@ -35,14 +35,14 @@
 
 - `encoder_decoder_lstm_permutation_feature_importance.csv`
 - `encoder_decoder_lstm_permutation_time_importance.csv`
-- `encoder_decoder_lstm_shap_feature_importance.csv` optional
+- `encoder_decoder_lstm_shap_feature_importance.csv` (`RUN_SHAP = True`일 때)
 
 `outputs/model_interpretation/figures/`:
 
 - `encoder_decoder_lstm_permutation_feature_importance_top.png`
 - `encoder_decoder_lstm_permutation_time_importance.png`
-- `encoder_decoder_lstm_shap_feature_importance_top.png` optional
+- `encoder_decoder_lstm_shap_feature_importance_top.png` (`RUN_SHAP = True`일 때)
 
 ## 주의 사항
 
-현재 notebook은 기존 encoder-decoder LSTM checkpoint인 `models/lstm_best_model_gpu.pt`가 있어야 실행됩니다. 해당 파일이 없으면 먼저 `src/6_modeling.ipynb`를 실행해 encoder-decoder LSTM을 학습하고 저장해야 합니다.
+현재 notebook은 기존 encoder-decoder LSTM checkpoint인 `models/lstm_best_model_gpu.pt`가 있는 상태에서 실행합니다. 먼저 `src/6_modeling.ipynb`를 실행해 encoder-decoder LSTM을 학습하고 저장합니다.

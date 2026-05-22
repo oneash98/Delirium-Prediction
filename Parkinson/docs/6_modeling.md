@@ -2,44 +2,145 @@
 
 ## Within t+2 비교 모델 추가
 
-`src/6_modeling_within_t_plus_2.ipynb`는 기존 전처리 산출물(`processed/data_split/`)을 그대로 사용해 비교용 ML baseline과 single-output LSTM을 학습합니다. 재사용 가능한 함수와 CLI 실행용 코드는 `src/6_modeling_within_t_plus_2.py`에 함께 둡니다.
+`src/6_modeling_within_t_plus_2.ipynb`는 기존 전처리 산출물(`processed/data_split/`)을 그대로 사용해 비교용 ML baseline, MLP baseline, single-output LSTM을 학습합니다. 노트북 단독 실행을 전제로 하며, 모델링 구현은 해당 `.ipynb` 안에 둡니다.
 
 - ML/deep learning baseline: LR, RF, XGB, LightGBM, MLP
 - ML input: `X_*_lstm.npy[:, -1, :]`, 즉 anchor `t` 시점 feature만 사용
 - ML target: `y_*_lstm.npy`, 즉 `t`, `t+1`, `t+2` 중 delirium 발생 여부
-- target window: binary within target에는 horizon별 mask가 없으므로 기본값은 `target_available_count >= 3`인 full `t~t+2` window만 사용
+- target window: binary within target에는 horizon별 mask가 없으므로 `target_available_count >= 3`인 full `t~t+2` window만 사용
 - LSTM input: 기존과 동일하게 `t-3~t` 4개 time step
 - LSTM output: encoder-decoder horizon 3개 출력이 아니라 `within_t_plus_2` binary logit 1개
-- CV: 기존과 동일하게 train split 내부 subject-level K-fold
+- CV: train split 내부 subject-level stratified K-fold
 - tuning objective: CV 평균 AUPRC
-- GPU: PyTorch MLP/LSTM은 CUDA 사용, XGB/LightGBM은 CUDA가 보이면 GPU parameter를 우선 사용
+- GPU: PyTorch MLP/LSTM은 CUDA 사용, XGB/LightGBM은 CUDA가 보이면 GPU parameter를 우선 사용하고 GPU fit 실패 시 CPU로 재학습
 
-실행 예시:
+실행:
 
 ```bash
 Parkinson/src/6_modeling_within_t_plus_2.ipynb
 ```
 
-빠른 smoke test:
+필요한 패키지는 `Parkinson/requirements-modeling.txt`에 정리했습니다.
 
-```bash
-python Parkinson/src/6_modeling_within_t_plus_2.py --models LR MLP LSTM --n-folds 2 --n-trials-ml 1 --n-trials-mlp 1 --n-trials-lstm 1 --max-epochs 1
-```
+### Within t+2 노트북 실행 흐름
 
-기존 masked multi-horizon 노트북처럼 마지막 bin 근처의 partial target window까지 포함하려면 `--allow-partial-target-window`를 추가합니다.
+`src/6_modeling_within_t_plus_2.ipynb`는 `src/6_modeling.ipynb`와 같은 앞부분 흐름을 따릅니다.
 
-XGB/LightGBM이 없는 환경에서는 해당 모델만 skip됩니다. 필요한 패키지는 `Parkinson/requirements-modeling.txt`에 정리했습니다.
+1. 실행 준비: library import, 경로 설정, 설정값, CUDA device와 seed 설정.
+2. 전처리 산출물 로딩: `required_files` 정의 후 `X_train`, `X_test`, `y_train_within_t_plus_2`, `y_test_within_t_plus_2`, horizon별 target/mask, metadata를 직접 로딩합니다.
+3. Full target window 적용: binary within target 분석에서는 `target_available_count >= 3`인 full `t~t+2` row만 유지합니다.
+4. ML baseline용 입력 생성: LR/RF/XGB/LightGBM/MLP는 `X_*[:, -1, :]`에서 anchor `t` 시점 feature만 사용합니다.
+5. Subject-level cross-validation split: train split 내부에서 `subject_id` 기준 stratified K-fold를 구성합니다.
+6. 모델링 함수 정의: 공통 metric과 보조 함수, ML baseline, MLP baseline, single-output LSTM 구현을 셀 단위로 정의합니다.
+7. Hyperparameter tuning: LR/RF/XGB/LightGBM, MLP, LSTM 순서로 Optuna tuning과 전체 train 재학습/test 평가를 수행합니다.
+8. 최종 결과 요약 저장: 모든 모델의 test metric을 `within_t_plus_2_test_metrics_summary.csv`로 저장합니다.
+
+### Within t+2 구현 셀 구조
+
+ML baseline 구현은 모델별로 나누어 둡니다.
+
+- `ML baseline 공통 함수`: estimator fit, prediction, XGB/LightGBM GPU 실패 시 CPU 재학습.
+- `Logistic Regression baseline`: LR 탐색 공간과 estimator.
+- `Random Forest baseline`: RF 탐색 공간과 estimator.
+- `XGBoost baseline`: XGB GPU parameter, 탐색 공간, estimator.
+- `LightGBM baseline`: LightGBM GPU parameter, 탐색 공간, estimator.
+- `ML baseline dispatch 함수`: 모델명에 따라 위 함수들을 연결합니다.
+- `ML baseline tuning 함수`: subject-level CV, Optuna tuning, test 평가, 저장을 수행합니다.
+
+MLP와 single-output LSTM도 각각 다음 셀로 분리합니다.
+
+- 모델과 DataLoader
+- 탐색 공간
+- fold 학습 함수
+- 전체 train 재학습 함수
+- tuning 함수
+
+### Within t+2 Hyperparameter 탐색 공간
+
+LR:
+
+- `C`: 1e-3-1e2, log scale
+- `penalty`: `l1`, `l2`
+- 고정 설정: `solver="liblinear"`, `class_weight="balanced"`, `max_iter=2000`
+
+RF:
+
+- `n_estimators`: 200-800, step 100
+- `max_depth`: `None`, 4, 8, 12, 16, 24
+- `min_samples_split`: 2, 5, 10, 20
+- `min_samples_leaf`: 1, 2, 4, 8
+- `max_features`: `sqrt`, `log2`, 0.5
+- 고정 설정: `class_weight="balanced_subsample"`, `n_jobs=-1`
+
+XGB:
+
+- `n_estimators`: 200-800, step 100
+- `max_depth`: 2-8
+- `learning_rate`: 0.01-0.2, log scale
+- `subsample`: 0.6-1.0
+- `colsample_bytree`: 0.6-1.0
+- `min_child_weight`: 1.0-20.0, log scale
+- `reg_alpha`: 1e-8-1.0, log scale
+- `reg_lambda`: 1e-3-10.0, log scale
+- 고정 설정: `objective="binary:logistic"`, `eval_metric="aucpr"`, train fold 기준 `scale_pos_weight`
+
+LightGBM:
+
+- `n_estimators`: 200-1000, step 100
+- `learning_rate`: 0.01-0.2, log scale
+- `num_leaves`: 15-127
+- `max_depth`: -1, 3, 5, 7, 9, 12
+- `min_child_samples`: 10-100
+- `subsample`: 0.6-1.0
+- `colsample_bytree`: 0.6-1.0
+- `reg_alpha`: 1e-8-1.0, log scale
+- `reg_lambda`: 1e-3-10.0, log scale
+- 고정 설정: `objective="binary"`, train fold 기준 `scale_pos_weight`
+
+MLP:
+
+- `hidden_size`: 64, 128, 256, 512
+- `num_layers`: 1-3
+- `dropout`: 0.0-0.5
+- `lr`: 1e-4-3e-3, log scale
+- `batch_size`: 32, 64, 128
+- `weight_decay`: 1e-6-1e-3, log scale
+- 학습 설정: `BCEWithLogitsLoss(pos_weight=...)`, AdamW, gradient clipping max norm 5.0, early stopping patience 5
+
+Single-output LSTM:
+
+- `hidden_size`: 32, 64, 128, 256
+- `num_layers`: 1-3
+- `dropout`: 0.0-0.5
+- `lr`: 1e-4-3e-3, log scale
+- `batch_size`: 32, 64, 128
+- `weight_decay`: 1e-6-1e-3, log scale
+- 학습 설정: `BCEWithLogitsLoss(pos_weight=...)`, AdamW, gradient clipping max norm 5.0, early stopping patience 5
 
 주요 출력:
 
 - `outputs/modeling/within_t_plus_2/*_t_point_tuning_results.csv`
+- `outputs/modeling/within_t_plus_2/*_t_point_cv_fold_metrics.csv`
+- `outputs/modeling/within_t_plus_2/*_t_point_optuna_trials.csv`
 - `outputs/modeling/within_t_plus_2/*_t_point_test_metrics.csv`
+- `outputs/modeling/within_t_plus_2/*_t_point_test_predictions.csv`
+- `outputs/modeling/within_t_plus_2/mlp_t_point_tuning_results.csv`
+- `outputs/modeling/within_t_plus_2/mlp_t_point_cv_fold_metrics.csv`
+- `outputs/modeling/within_t_plus_2/mlp_t_point_cv_fold_history.csv`
+- `outputs/modeling/within_t_plus_2/mlp_t_point_optuna_trials.csv`
 - `outputs/modeling/within_t_plus_2/mlp_t_point_test_metrics.csv`
+- `outputs/modeling/within_t_plus_2/mlp_t_point_test_predictions.csv`
 - `outputs/modeling/within_t_plus_2/lstm_within_t_plus_2_tuning_results.csv`
+- `outputs/modeling/within_t_plus_2/lstm_within_t_plus_2_cv_fold_metrics.csv`
+- `outputs/modeling/within_t_plus_2/lstm_within_t_plus_2_cv_fold_history.csv`
+- `outputs/modeling/within_t_plus_2/lstm_within_t_plus_2_optuna_trials.csv`
 - `outputs/modeling/within_t_plus_2/lstm_within_t_plus_2_test_metrics.csv`
+- `outputs/modeling/within_t_plus_2/lstm_within_t_plus_2_test_predictions.csv`
 - `outputs/modeling/within_t_plus_2/within_t_plus_2_test_metrics_summary.csv`
 - `models/within_t_plus_2/*_t_point_within_t_plus_2.joblib`
+- `models/within_t_plus_2/mlp_t_point_within_t_plus_2_best_model.pt`
 - `models/within_t_plus_2/lstm_within_t_plus_2_best_model.pt`
+- `models/within_t_plus_2/lstm_within_t_plus_2_best_model_config.json`
 
 `src/6_modeling.ipynb`는 `5_data_preprocessing.ipynb`에서 생성한 LSTM tensor를 사용해 encoder-decoder multi-horizon LSTM을 학습하고, masked loss/metric으로 검증 및 test 평가를 수행합니다.
 
@@ -72,13 +173,7 @@ XGB/LightGBM이 없는 환경에서는 해당 모델만 skip됩니다. 필요한
 
 ## 경로 설정
 
-노트북은 실행 위치가 다음 중 어디인지 확인해 `PROJECT_DIR`을 설정합니다.
-
-- `Parkinson/src`
-- `Parkinson`
-- repository root
-
-따라서 Jupyter를 `Parkinson/src`, `Parkinson`, repository root 중 어디에서 열어도 `Parkinson/processed/data_split`을 찾을 수 있습니다.
+노트북은 Jupyter 작업 디렉터리를 `Parkinson/src`로 둔 상태에서 실행합니다. `PROJECT_DIR`은 `Path.cwd().resolve().parent`로 고정합니다.
 
 ## Cross-Validation Split
 

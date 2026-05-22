@@ -40,7 +40,7 @@ MIMIC-IV 기반 Parkinson 코호트에서 ICU 섬망 평가를 outcome으로 사
 6. `5_data_preprocessing.ipynb`를 실행해 tensor와 target mask를 생성합니다.
 7. `6_modeling.ipynb`를 실행해 masked LSTM 모델을 학습합니다.
 
-노트북은 실행 위치가 `Parkinson/src`, `Parkinson`, repository root 중 어디인지 확인해 `PROJECT_DIR`을 설정합니다. 따라서 Jupyter를 `Parkinson/src`에서 열어도 되고, repository root에서 열어도 `Parkinson/processed/modeling` 같은 하위 경로를 찾을 수 있습니다.
+노트북은 Jupyter 작업 디렉터리를 `Parkinson/src`로 둔 상태에서 위에서 아래로 실행하는 것을 전제로 합니다. `PROJECT_DIR`은 `Path.cwd().resolve().parent`로 고정하며, 실행 위치를 추론하는 fallback 코드를 추가하지 않습니다.
 
 ## 데이터 흐름
 
@@ -157,6 +157,12 @@ Preprocessing 단계에서는 `hours`를 현재 bin까지의 ICU 경과시간 fe
 
 ## 작업 시 주의사항
 
+- 이 프로젝트는 범용 서비스나 패키지 개발이 아니라 정해진 연구 설계에 맞춘 데이터분석 노트북 작업입니다. 사용자가 명시하지 않은 실행 옵션, CLI, 경로/입력조건 자동 감지, fallback 분기, 누락 파일 대체 생성 로직을 추가하지 않습니다.
+- 노트북은 연구 설계와 실행 순서가 드러나도록 직선적으로 작성합니다. “이런 경우/저런 경우”를 가정해 분기하지 말고, 정해진 입력 파일, 컬럼, 경로, target 정의가 존재한다고 보고 사용합니다.
+- Parkinson 노트북의 작업 위치는 `Parkinson/src`로 고정합니다. 경로 설정은 `PROJECT_DIR = Path.cwd().resolve().parent`를 사용하고, `cwd.name` 조건문으로 repository root나 다른 위치를 자동 탐색하지 않습니다.
+- 연구 설계에서 고정된 조건은 config 옵션으로 만들지 않습니다. 예를 들어 within `t~t+2` 모델링은 full `t~t+2` target이 모두 관측된 row만 사용하며, partial target window 허용 옵션을 만들지 않습니다.
+- 단, XGB/LightGBM처럼 GPU 학습이 환경 문제로 실패할 수 있는 모델은 같은 연구 설계를 유지한 채 CPU로 재학습하는 fallback을 둡니다. 이 경우 결과 테이블에 fallback 여부를 남깁니다.
+- 노트북 단독 실행이 요청된 분석에서는 helper `.py` 파일이나 CLI 실행 경로를 새로 만들지 않습니다. 필요한 구현은 해당 `.ipynb` 안에 둡니다.
 - 사용자가 명시적으로 요청하지 않은 기존 주석은 수정하거나 삭제하지 않습니다.
 - 코드 수정 시 새 로직 설명에 꼭 필요한 최소 주석만 추가합니다.
 - 기존 코드, 노트북 셀 구조, 문서 내용은 요청 범위에 필요한 부분만 최소 변경합니다.
