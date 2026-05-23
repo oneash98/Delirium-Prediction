@@ -6,7 +6,8 @@
 
 - within `t~t+2` 비교 모델의 test 성능 시각화
 - 모델별 row-level predicted probability 분포 확인
-- single-output LSTM과 multi-horizon LSTM의 t-1 delirium 상태별 평가
+- multi-horizon XGBoost, multi-output MLP, encoder-decoder LSTM의 horizon별 성능 비교
+- single-output LSTM과 multi-horizon 추가 테스트 모델의 t-1 delirium 상태별 평가
 - t-1에 delirium이 없던 case에서 new onset 예측 성능 평가
 - t-1에 delirium이 있던 case에서 recovery 예측 성능 평가
 
@@ -24,6 +25,11 @@
 `outputs/modeling/`:
 
 - `lstm_gpu_test_predictions.csv`
+- `xgb_multi_horizon_test_predictions.csv`
+- `mlp_multi_horizon_test_predictions.csv`
+- `multi_horizon_test_metrics_summary.csv`
+- `xgb_multi_horizon_test_metrics_by_horizon.csv`
+- `mlp_multi_horizon_test_metrics_by_horizon.csv`
 - `lstm_gpu_test_metrics.csv`
 - `lstm_gpu_test_metrics_by_horizon.csv`
 
@@ -48,7 +54,7 @@ Recovery 평가:
 - true label: within `t~t+2` 동안 delirium이 없는지 여부
 - probability: `1 - delirium_probability`
 
-Multi-horizon LSTM은 추가로 horizon별 `y_t`, `y_t_plus_1`, `y_t_plus_2`에 대해 같은 방식으로 new onset/recovery를 평가합니다. 즉, t-1 delirium이 없던 case에서는 각 horizon의 delirium 발생을 보고, t-1 delirium이 있던 case에서는 각 horizon의 non-delirium을 recovery로 봅니다.
+Multi-horizon 추가 테스트 모델은 추가로 horizon별 `y_t`, `y_t_plus_1`, `y_t_plus_2`에 대해 같은 방식으로 new onset/recovery를 평가합니다. 즉, t-1 delirium이 없던 case에서는 각 horizon의 delirium 발생을 보고, t-1 delirium이 있던 case에서는 각 horizon의 non-delirium을 recovery로 봅니다.
 
 ## 출력 파일
 
@@ -56,8 +62,12 @@ Multi-horizon LSTM은 추가로 horizon별 `y_t`, `y_t_plus_1`, `y_t_plus_2`에 
 
 - `within_t_plus_2_t_minus_1_stratified_metrics.csv`
 - `lstm_t_minus_1_stratified_metrics.csv`
+- `multi_horizon_models_t_minus_1_stratified_metrics.csv`
 - `multi_horizon_lstm_t_minus_1_horizon_metrics.csv`
+- `multi_horizon_models_t_minus_1_horizon_metrics.csv`
 - `within_t_plus_2_test_predictions_all_models_with_t_minus_1.csv`
+- `xgb_multi_horizon_test_predictions_with_t_minus_1.csv`
+- `mlp_multi_horizon_test_predictions_with_t_minus_1.csv`
 - `lstm_gpu_test_predictions_with_t_minus_1.csv`
 
 `outputs/modeling/figures/`:
@@ -65,9 +75,12 @@ Multi-horizon LSTM은 추가로 horizon별 `y_t`, `y_t_plus_1`, `y_t_plus_2`에 
 - `within_t_plus_2_test_auprc_by_model.png`
 - `within_t_plus_2_probability_distribution_by_model.png`
 - `result_analysis_multi_horizon_lstm_metrics.png`
+- `multi_horizon_test_within_t_plus_2_auprc_by_model.png`
+- `multi_horizon_test_horizon_auprc_by_model.png`
 - `within_t_plus_2_t_minus_1_stratified_auprc.png`
 - `lstm_t_minus_1_stratified_auprc_auroc.png`
 - `multi_horizon_lstm_t_minus_1_horizon_auprc.png`
+- `multi_horizon_models_t_minus_1_*_horizon_auprc.png`
 
 ## 실행 순서
 

@@ -17,7 +17,7 @@ MIMIC-IV 기반 Parkinson 코호트에서 ICU 섬망 평가를 outcome으로 사
 - `src/3_eda.ipynb`: transform 산출물을 읽어 환자 기본정보와 12시간 bin-level feature missingness EDA를 수행합니다.
 - `src/4_train_test_construction.ipynb`: transform 산출물을 읽어 subject-level train/test split과 LSTM sequence index를 만듭니다.
 - `src/5_data_preprocessing.ipynb`: split 산출물과 sequence index를 읽어 LSTM tensor와 target mask를 생성합니다.
-- `src/6_modeling.ipynb`: within `t~t+2` 비교 모델을 먼저 학습한 뒤 multi-horizon masked LSTM을 추가 테스트로 학습합니다.
+- `src/6_modeling.ipynb`: within `t~t+2` 비교 모델을 먼저 학습한 뒤 multi-horizon XGBoost, multi-output MLP, masked LSTM을 추가 테스트로 학습합니다.
 - `src/7_result_analysis.ipynb`: 모델링 산출물을 읽어 결과 시각화와 t-1 delirium 상태별 추가 평가를 수행합니다.
 - `src/8_model_interpretation.ipynb`: encoder-decoder multi-horizon LSTM 모델 해석을 수행합니다.
 - `src/extraction_variable_catalog.md`: 추출 대상 변수 catalog 문서입니다.
@@ -42,7 +42,7 @@ MIMIC-IV 기반 Parkinson 코호트에서 ICU 섬망 평가를 outcome으로 사
 4. 필요 시 `3_eda.ipynb`를 실행해 cohort EDA를 확인합니다.
 5. `4_train_test_construction.ipynb`를 실행해 subject-level train/test split과 LSTM sequence index를 생성합니다.
 6. `5_data_preprocessing.ipynb`를 실행해 tensor와 target mask를 생성합니다.
-7. `6_modeling.ipynb`를 실행해 within `t~t+2` 비교 모델과 multi-horizon masked LSTM을 학습합니다.
+7. `6_modeling.ipynb`를 실행해 within `t~t+2` 비교 모델과 multi-horizon 추가 테스트 모델을 학습합니다.
 8. 필요 시 `7_result_analysis.ipynb`를 실행해 결과 시각화와 t-1 delirium 상태별 평가를 확인합니다.
 9. 필요 시 `8_model_interpretation.ipynb`를 실행해 encoder-decoder LSTM 모델 해석을 수행합니다.
 
@@ -105,9 +105,12 @@ Parkinson/data/*.csv
          mlp_t_point_test_predictions.csv
          lstm_within_t_plus_2_test_predictions.csv
        lstm_gpu_tuning_results.csv
+       xgb_multi_horizon_test_predictions.csv
+       mlp_multi_horizon_test_predictions.csv
        lstm_gpu_test_metrics.csv
        lstm_gpu_test_metrics_by_horizon.csv
        lstm_gpu_test_predictions.csv
+       multi_horizon_test_metrics_summary.csv
   -> models/
        within_t_plus_2/
          *_t_point_within_t_plus_2.joblib
@@ -120,7 +123,11 @@ Parkinson/data/*.csv
        within_t_plus_2_t_minus_1_stratified_metrics.csv
        lstm_t_minus_1_stratified_metrics.csv
        multi_horizon_lstm_t_minus_1_horizon_metrics.csv
+       multi_horizon_models_t_minus_1_stratified_metrics.csv
+       multi_horizon_models_t_minus_1_horizon_metrics.csv
        within_t_plus_2_test_predictions_all_models_with_t_minus_1.csv
+       xgb_multi_horizon_test_predictions_with_t_minus_1.csv
+       mlp_multi_horizon_test_predictions_with_t_minus_1.csv
        lstm_gpu_test_predictions_with_t_minus_1.csv
   -> src/8_model_interpretation.ipynb
   -> outputs/model_interpretation/

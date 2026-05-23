@@ -1,6 +1,6 @@
 # 6_modeling
 
-`src/6_modeling.ipynb`는 기존 전처리 산출물(`processed/data_split/`)을 그대로 사용해 within `t~t+2` 비교 모델을 먼저 학습하고, 마지막에 multi-horizon masked LSTM을 추가 테스트로 학습합니다. 모델링 구현은 해당 `.ipynb` 안에 둡니다.
+`src/6_modeling.ipynb`는 기존 전처리 산출물(`processed/data_split/`)을 그대로 사용해 within `t~t+2` 비교 모델을 먼저 학습하고, 마지막에 multi-horizon XGBoost, multi-output MLP, encoder-decoder LSTM을 추가 테스트로 학습합니다. 모델링 구현은 해당 `.ipynb` 안에 둡니다.
 
 ## Within t+2 비교 모델
 
@@ -28,10 +28,10 @@ Parkinson/src/6_modeling.ipynb
 1. 실행 준비: library import, 경로 설정, 설정값, CUDA device와 seed 설정.
 2. 전처리 산출물 로딩: `required_files` 정의 후 `X_train`, `X_test`, `y_train_within_t_plus_2`, `y_test_within_t_plus_2`, horizon별 target/mask, metadata를 직접 로딩합니다.
 3. Full target window subset 생성: within `t~t+2` 비교 모델용으로 `target_available_count >= 3`인 row를 별도 `*_within` 변수에 저장합니다.
-4. 공통 subject-level CV split 생성: 전체 train metadata 기준 subject split을 만든 뒤, within 비교 모델과 multi-horizon LSTM에 각각 row mask를 적용합니다.
+4. 공통 subject-level CV split 생성: 전체 train metadata 기준 subject split을 만든 뒤, within 비교 모델과 multi-horizon 모델에 각각 row mask를 적용합니다.
 5. Within `t~t+2` 비교 모델 학습: LR/RF/XGB/LightGBM, MLP, single-output LSTM 순서로 Optuna tuning과 전체 train 재학습/test 평가를 수행합니다.
 6. Within `t~t+2` 최종 비교 저장: 모델별 test metric summary와 모델별 probability를 합친 row-level prediction table을 저장합니다.
-7. Multi-horizon masked LSTM 추가 테스트: 전체 sequence row와 horizon mask를 사용해 encoder-decoder LSTM을 학습하고 horizon별 test probability와 metric을 저장합니다.
+7. Multi-horizon 추가 테스트: XGBoost horizon별 독립 모델, multi-output MLP, encoder-decoder LSTM을 학습하고 horizon별 test probability와 metric을 저장합니다.
 
 ### Within t+2 구현 셀 구조
 
@@ -143,7 +143,7 @@ Single-output LSTM:
 - `models/within_t_plus_2/lstm_within_t_plus_2_best_model.pt`
 - `models/within_t_plus_2/lstm_within_t_plus_2_best_model_config.json`
 
-`src/6_modeling.ipynb`는 `5_data_preprocessing.ipynb`에서 생성한 LSTM tensor를 사용해 encoder-decoder multi-horizon LSTM을 학습하고, masked loss/metric으로 검증 및 test 평가를 수행합니다.
+Multi-horizon 추가 테스트는 `5_data_preprocessing.ipynb`에서 생성한 LSTM tensor와 horizon별 target mask를 사용합니다. XGBoost와 multi-output MLP는 anchor `t` 시점 feature를 입력으로 쓰고, encoder-decoder LSTM은 `t-3~t` sequence 전체를 입력으로 사용합니다.
 
 노트북은 주피터에서 위에서 아래로 한 셀씩 실행하는 흐름을 전제로 구성합니다. 각 단계는 준비, 로딩, subject-level CV 구성, 모델/평가 함수 정의, hyperparameter tuning, 전체 train 재학습, test 평가, 결과 저장 순서입니다.
 
@@ -168,7 +168,7 @@ Single-output LSTM:
 2. 전처리 산출물 로딩: LSTM tensor, target, mask, metadata 로딩과 기본 분포 확인.
 3. Subject-level cross-validation split: train set 내부에서 `subject_id` 기준 K-fold CV 구성.
 4. 모델과 평가 함수 정의: LSTM class, DataLoader, metric, prediction 함수 정의.
-5. Hyperparameter tuning: Optuna로 CV 평균 macro AUPRC 기준 best trial 선택.
+5. Hyperparameter tuning: Optuna로 CV 평균 within `t~t+2` AUPRC 기준 best trial 선택.
 6. Best parameter 전체 train 재학습과 test 평가: 선택된 best parameter로 전체 train set을 다시 학습한 뒤 test set metric과 prediction 생성.
 7. 결과 저장: tuning 결과, test metric, prediction, model checkpoint, config 저장.
 
@@ -226,16 +226,31 @@ Summary metric:
 - `within_t_plus_1_*`: `t~t+1` 중 하나라도 양성인 window 기준 metric
 - `within_t_plus_2_*`: `t~t+2` 중 하나라도 양성인 window 기준 metric
 
-Hyperparameter tuning의 선택 기준은 fold별 `macro_auprc`의 CV 평균입니다. Class imbalance가 있는 outcome이므로 AUPRC를 주요 기준으로 사용합니다.
+Hyperparameter tuning의 선택 기준은 fold별 `within_t_plus_2_auprc`의 CV 평균입니다. 최종 비교 endpoint가 within `t~t+2` binary outcome이므로, multi-horizon 모델도 horizon별 probability를 결합한 within-window AUPRC를 기준으로 선택합니다. `macro_auprc`와 horizon별 AUPRC는 보조 성능 지표로 함께 저장합니다.
 
 ## Hyperparameter Tuning
 
 Optuna 설정:
 
-- `N_TRIALS = 30`
+- `N_TRIALS_MULTI_XGB = 30`
+- `N_TRIALS_MULTI_MLP = 30`
+- `N_TRIALS_MULTI_HORIZON = 30`
 - sampler: `TPESampler(seed=RANDOM_STATE)`
 
-탐색 공간:
+XGBoost horizon별 독립 모델:
+
+- 입력: anchor `t` 시점 feature
+- 출력: `y_t`, `y_t_plus_1`, `y_t_plus_2` 각각에 대한 독립 binary classifier
+- 탐색 공간: within `t~t+2` XGB baseline과 동일
+- 평가: horizon별 probability를 `masked_horizon_metrics`에 넣어 within-window AUPRC, macro AUPRC, horizon별 metric 계산
+
+Multi-output MLP:
+
+- 입력: anchor `t` 시점 feature
+- 출력: 3개 logit, 즉 `y_t`, `y_t_plus_1`, `y_t_plus_2`
+- masked BCE loss: target mask가 0인 horizon은 loss에서 제외
+
+Encoder-decoder LSTM 탐색 공간:
 
 - `hidden_size`: 32, 64, 128, 256
 - `num_layers`: 1-3
@@ -250,13 +265,28 @@ Optuna 설정:
 - `PATIENCE = 5`
 - optimizer: AdamW
 - gradient clipping: max norm 5.0
-- fold별 best checkpoint 기준: validation fold `macro_auprc`
+- fold별 best checkpoint 기준: validation fold `within_t_plus_2_auprc`
 - 최종 모델: best parameter로 전체 train set을 CV 평균 best epoch만큼 재학습
 
 ## 출력 파일
 
 `outputs/modeling/`:
 
+- `multi_horizon_test_metrics_summary.csv`: XGBoost, multi-output MLP, encoder-decoder LSTM의 multi-horizon test summary.
+- `xgb_multi_horizon_tuning_results.csv`
+- `xgb_multi_horizon_optuna_trials.csv`
+- `xgb_multi_horizon_cv_fold_metrics.csv`
+- `xgb_multi_horizon_test_metrics.csv`
+- `xgb_multi_horizon_test_metrics_by_horizon.csv`
+- `xgb_multi_horizon_test_predictions.csv`
+- `mlp_multi_horizon_tuning_results.csv`
+- `mlp_multi_horizon_optuna_trials.csv`
+- `mlp_multi_horizon_cv_fold_metrics.csv`
+- `mlp_multi_horizon_cv_fold_metrics_by_horizon.csv`
+- `mlp_multi_horizon_cv_fold_history.csv`
+- `mlp_multi_horizon_test_metrics.csv`
+- `mlp_multi_horizon_test_metrics_by_horizon.csv`
+- `mlp_multi_horizon_test_predictions.csv`
 - `lstm_gpu_tuning_results.csv`: Optuna trial별 CV 평균/표준편차 metric.
 - `lstm_gpu_optuna_trials.csv`: Optuna trial summary와 parameter.
 - `lstm_gpu_cv_fold_metrics.csv`: trial/fold별 validation fold summary metric.
@@ -266,13 +296,15 @@ Optuna 설정:
 - `lstm_gpu_test_metrics_by_horizon.csv`: best parameter로 재학습한 최종 model의 test horizon별 metric.
 - `lstm_gpu_test_predictions.csv`: test sequence별 true label, mask, probability, threshold 0.5 prediction.
 - `figures/lstm_final_train_loss.png`: 최종 전체 train 재학습의 train loss curve.
-- `figures/lstm_best_trial_cv_macro_auprc.png`: best trial의 fold별 validation macro AUPRC curve와 epoch별 CV 평균 curve.
+- `figures/lstm_best_trial_cv_within_t_plus_2_auprc.png`: best trial의 fold별 validation within `t~t+2` AUPRC curve와 epoch별 CV 평균 curve.
 - `figures/lstm_test_horizon_auprc_auroc.png`: test set horizon별 AUPRC/AUROC bar plot.
 
 `models/`:
 
 - `lstm_best_model_gpu.pt`: model state dict, parameters, CV/test metric이 포함된 PyTorch payload.
 - `lstm_best_model_gpu_config.json`: best model 설정과 평가 결과 요약.
+- `xgb_multi_horizon.joblib`: horizon별 XGBoost model payload.
+- `mlp_multi_horizon_best_model.pt`: multi-output MLP model payload.
 
 ## QA 체크
 
@@ -287,7 +319,7 @@ Optuna 설정:
 - CV fold별 validation horizon positive rate
 - Optuna trial별 CV 평균 핵심 metric
 - 최종 train loss curve
-- best trial의 CV validation macro AUPRC curve
+- best trial의 CV validation within `t~t+2` AUPRC curve
 - test horizon별 AUPRC/AUROC bar plot
 - 최종 test summary metric과 horizon별 metric
 
