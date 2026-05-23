@@ -1,13 +1,14 @@
 # 6_modeling
 
-## Within t+2 비교 모델 추가
+`src/6_modeling.ipynb`는 기존 전처리 산출물(`processed/data_split/`)을 그대로 사용해 within `t~t+2` 비교 모델을 먼저 학습하고, 마지막에 multi-horizon masked LSTM을 추가 테스트로 학습합니다. 모델링 구현은 해당 `.ipynb` 안에 둡니다.
 
-`src/6_modeling_within_t_plus_2.ipynb`는 기존 전처리 산출물(`processed/data_split/`)을 그대로 사용해 비교용 ML baseline, MLP baseline, single-output LSTM을 학습합니다. 노트북 단독 실행을 전제로 하며, 모델링 구현은 해당 `.ipynb` 안에 둡니다.
+## Within t+2 비교 모델
 
 - ML/deep learning baseline: LR, RF, XGB, LightGBM, MLP
 - ML input: `X_*_lstm.npy[:, -1, :]`, 즉 anchor `t` 시점 feature만 사용
 - ML target: `y_*_lstm.npy`, 즉 `t`, `t+1`, `t+2` 중 delirium 발생 여부
 - target window: binary within target에는 horizon별 mask가 없으므로 `target_available_count >= 3`인 full `t~t+2` window만 사용
+- feature scaling: `5_data_preprocessing.ipynb`에서 train 기준 numeric imputation과 `StandardScaler`가 이미 적용된 `X_*_lstm.npy`를 그대로 사용하며, 모델링 노트북에서는 LR/MLP 포함 baseline에 별도 sklearn scaler를 다시 fit하지 않음
 - LSTM input: 기존과 동일하게 `t-3~t` 4개 time step
 - LSTM output: encoder-decoder horizon 3개 출력이 아니라 `within_t_plus_2` binary logit 1개
 - CV: train split 내부 subject-level stratified K-fold
@@ -17,23 +18,20 @@
 실행:
 
 ```bash
-Parkinson/src/6_modeling_within_t_plus_2.ipynb
+Parkinson/src/6_modeling.ipynb
 ```
 
 필요한 패키지는 `Parkinson/requirements-modeling.txt`에 정리했습니다.
 
-### Within t+2 노트북 실행 흐름
-
-`src/6_modeling_within_t_plus_2.ipynb`는 `src/6_modeling.ipynb`와 같은 앞부분 흐름을 따릅니다.
+### 통합 노트북 실행 흐름
 
 1. 실행 준비: library import, 경로 설정, 설정값, CUDA device와 seed 설정.
 2. 전처리 산출물 로딩: `required_files` 정의 후 `X_train`, `X_test`, `y_train_within_t_plus_2`, `y_test_within_t_plus_2`, horizon별 target/mask, metadata를 직접 로딩합니다.
-3. Full target window 적용: binary within target 분석에서는 `target_available_count >= 3`인 full `t~t+2` row만 유지합니다.
-4. ML baseline용 입력 생성: LR/RF/XGB/LightGBM/MLP는 `X_*[:, -1, :]`에서 anchor `t` 시점 feature만 사용합니다.
-5. Subject-level cross-validation split: train split 내부에서 `subject_id` 기준 stratified K-fold를 구성합니다.
-6. 모델링 함수 정의: 공통 metric과 보조 함수, ML baseline, MLP baseline, single-output LSTM 구현을 셀 단위로 정의합니다.
-7. Hyperparameter tuning: LR/RF/XGB/LightGBM, MLP, LSTM 순서로 Optuna tuning과 전체 train 재학습/test 평가를 수행합니다.
-8. 최종 결과 요약 저장: 모든 모델의 test metric을 `within_t_plus_2_test_metrics_summary.csv`로 저장합니다.
+3. Full target window subset 생성: within `t~t+2` 비교 모델용으로 `target_available_count >= 3`인 row를 별도 `*_within` 변수에 저장합니다.
+4. 공통 subject-level CV split 생성: 전체 train metadata 기준 subject split을 만든 뒤, within 비교 모델과 multi-horizon LSTM에 각각 row mask를 적용합니다.
+5. Within `t~t+2` 비교 모델 학습: LR/RF/XGB/LightGBM, MLP, single-output LSTM 순서로 Optuna tuning과 전체 train 재학습/test 평가를 수행합니다.
+6. Within `t~t+2` 최종 비교 저장: 모델별 test metric summary와 모델별 probability를 합친 row-level prediction table을 저장합니다.
+7. Multi-horizon masked LSTM 추가 테스트: 전체 sequence row와 horizon mask를 사용해 encoder-decoder LSTM을 학습하고 horizon별 test probability와 metric을 저장합니다.
 
 ### Within t+2 구현 셀 구조
 
@@ -46,6 +44,8 @@ ML baseline 구현은 모델별로 나누어 둡니다.
 - `LightGBM baseline`: LightGBM GPU parameter, 탐색 공간, estimator.
 - `ML baseline dispatch 함수`: 모델명에 따라 위 함수들을 연결합니다.
 - `ML baseline tuning 함수`: subject-level CV, Optuna tuning, test 평가, 저장을 수행합니다.
+
+ML baseline과 MLP baseline은 `5_data_preprocessing.ipynb`에서 저장한 feature matrix를 그대로 사용합니다. numeric feature는 이미 train split 기준 imputation과 scaling이 적용되어 있으므로, `6_modeling.ipynb`에서는 fold별 또는 전체 train 기준 sklearn `StandardScaler`를 다시 fit하지 않습니다. PyTorch 코드의 `torch.amp.GradScaler`는 mixed precision gradient scaling 용도이며 feature scaling과 별개입니다.
 
 MLP와 single-output LSTM도 각각 다음 셀로 분리합니다.
 
@@ -137,6 +137,7 @@ Single-output LSTM:
 - `outputs/modeling/within_t_plus_2/lstm_within_t_plus_2_test_metrics.csv`
 - `outputs/modeling/within_t_plus_2/lstm_within_t_plus_2_test_predictions.csv`
 - `outputs/modeling/within_t_plus_2/within_t_plus_2_test_metrics_summary.csv`
+- `outputs/modeling/within_t_plus_2/within_t_plus_2_test_predictions_all_models.csv`
 - `models/within_t_plus_2/*_t_point_within_t_plus_2.joblib`
 - `models/within_t_plus_2/mlp_t_point_within_t_plus_2_best_model.pt`
 - `models/within_t_plus_2/lstm_within_t_plus_2_best_model.pt`

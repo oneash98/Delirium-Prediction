@@ -1,6 +1,6 @@
-# 7_model_interpretation
+# 8_model_interpretation
 
-`src/7_model_interpretation.ipynb`는 `src/6_modeling.ipynb`에서 학습한 기존 encoder-decoder multi-horizon LSTM만 대상으로 모델 해석을 수행합니다.
+`src/8_model_interpretation.ipynb`는 `src/6_modeling.ipynb`에서 학습한 기존 encoder-decoder multi-horizon LSTM만 대상으로 모델 해석을 수행합니다.
 
 ## 입력 파일
 
