@@ -39,9 +39,10 @@ Catalog의 `feature_name`과 정확히 일치하는 binary/categorical 변수만
 
 - train split 기준으로만 missingness, imputation 값, scaling 값, category level을 fit
 - 결측치가 심한 변수는 명시 목록 기준으로 `binned`에서 실제 제거
+- aggregation 파생 변수는 모델 입력에서 `{feature}_mean`, `{feature}_min`, `{feature}_max`만 유지하고 `{feature}_median`, `{feature}_std`, `{feature}_count`, `{feature}_latest`는 제외
 - numeric feature: train 기준 imputation 후 `StandardScaler` 적용
 - lab/most recent numeric feature: 해당 컬럼의 train median으로 imputation
-- aggregation numeric feature: `{feature}_mean`, `{feature}_median`, `{feature}_min`, `{feature}_max`, `{feature}_latest`는 같은 feature의 `{feature}_latest` train median으로 imputation
+- aggregation numeric feature: 모델 입력에 남긴 `{feature}_mean`, `{feature}_min`, `{feature}_max`는 같은 feature의 `{feature}_latest` train median으로 imputation
 - aggregation의 `{feature}_count`, `{feature}_std` 및 기타 numeric feature: 해당 컬럼의 train median으로 imputation
 - numeric binary feature: `0/1` 그대로 사용, missing은 `0`
 - text binary feature: train level 기준 one-hot

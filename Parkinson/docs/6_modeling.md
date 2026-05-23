@@ -65,57 +65,57 @@ LR:
 
 RF:
 
-- `n_estimators`: 200-800, step 100
-- `max_depth`: `None`, 4, 8, 12, 16, 24
-- `min_samples_split`: 2, 5, 10, 20
-- `min_samples_leaf`: 1, 2, 4, 8
+- `n_estimators`: 300-1500, step 100
+- `max_depth`: 4, 8, 12, 16, 24, 32, `None`
+- `min_samples_split`: 2, 5, 10, 20, 50
+- `min_samples_leaf`: 1, 2, 4, 8, 16
 - `max_features`: `sqrt`, `log2`, 0.5
 - 고정 설정: `class_weight="balanced_subsample"`, `n_jobs=-1`
 
 XGB:
 
-- `n_estimators`: 200-800, step 100
-- `max_depth`: 2-8
-- `learning_rate`: 0.01-0.2, log scale
-- `subsample`: 0.6-1.0
-- `colsample_bytree`: 0.6-1.0
-- `min_child_weight`: 1.0-20.0, log scale
-- `reg_alpha`: 1e-8-1.0, log scale
-- `reg_lambda`: 1e-3-10.0, log scale
+- `n_estimators`: 200-1500, step 100
+- `max_depth`: 2-12
+- `learning_rate`: 0.005-0.2, log scale
+- `subsample`: 0.5-1.0
+- `colsample_bytree`: 0.5-1.0
+- `min_child_weight`: 1.0-50.0, log scale
+- `reg_alpha`: 1e-8-10.0, log scale
+- `reg_lambda`: 1e-3-100.0, log scale
 - 고정 설정: `objective="binary:logistic"`, `eval_metric="aucpr"`, train fold 기준 `scale_pos_weight`
 
 LightGBM:
 
-- `n_estimators`: 200-1000, step 100
-- `learning_rate`: 0.01-0.2, log scale
-- `num_leaves`: 15-127
+- `n_estimators`: 200-1500, step 100
+- `learning_rate`: 0.005-0.2, log scale
+- `num_leaves`: 15-256
 - `max_depth`: -1, 3, 5, 7, 9, 12
-- `min_child_samples`: 10-100
-- `subsample`: 0.6-1.0
-- `colsample_bytree`: 0.6-1.0
-- `reg_alpha`: 1e-8-1.0, log scale
-- `reg_lambda`: 1e-3-10.0, log scale
+- `min_child_samples`: 10-200
+- `subsample`: 0.5-1.0
+- `colsample_bytree`: 0.5-1.0
+- `reg_alpha`: 1e-8-10.0, log scale
+- `reg_lambda`: 1e-3-100.0, log scale
 - 고정 설정: `objective="binary"`, train fold 기준 `scale_pos_weight`
 
 MLP:
 
-- `hidden_size`: 64, 128, 256, 512
+- `hidden_size`: 64, 128, 256
 - `num_layers`: 1-3
-- `dropout`: 0.0-0.5
+- `dropout`: 0.1-0.5
 - `lr`: 1e-4-3e-3, log scale
 - `batch_size`: 32, 64, 128
 - `weight_decay`: 1e-6-1e-3, log scale
-- 학습 설정: `BCEWithLogitsLoss(pos_weight=...)`, AdamW, gradient clipping max norm 5.0, early stopping patience 5
+- 학습 설정: `BCEWithLogitsLoss(pos_weight=...)`, AdamW, gradient clipping max norm 5.0, early stopping patience 10
 
 Single-output LSTM:
 
-- `hidden_size`: 32, 64, 128, 256
+- `hidden_size`: 64, 128, 256
 - `num_layers`: 1-3
 - `dropout`: 0.0-0.5
 - `lr`: 1e-4-3e-3, log scale
 - `batch_size`: 32, 64, 128
 - `weight_decay`: 1e-6-1e-3, log scale
-- 학습 설정: `BCEWithLogitsLoss(pos_weight=...)`, AdamW, gradient clipping max norm 5.0, early stopping patience 5
+- 학습 설정: `BCEWithLogitsLoss(pos_weight=...)`, AdamW, gradient clipping max norm 5.0, early stopping patience 10
 
 주요 출력:
 
@@ -234,9 +234,14 @@ Hyperparameter tuning의 선택 기준은 fold별 `within_t_plus_2_auprc`의 CV 
 
 Optuna 설정:
 
-- `N_TRIALS_MULTI_XGB = 30`
-- `N_TRIALS_MULTI_MLP = 30`
-- `N_TRIALS_MULTI_HORIZON = 30`
+- `N_TRIALS_ML = 100`
+- `N_TRIALS_MLP = 100`
+- `N_TRIALS_LSTM = 100`
+- `N_TRIALS_MULTI_XGB = 100`
+- `N_TRIALS_MULTI_MLP = 100`
+- `N_TRIALS_MULTI_HORIZON = 100`
+- `MAX_EPOCHS = 100`
+- `PATIENCE = 10`
 - sampler: `TPESampler(seed=RANDOM_STATE)`
 
 XGBoost horizon별 독립 모델:
@@ -263,8 +268,8 @@ Encoder-decoder LSTM 탐색 공간:
 
 학습 설정:
 
-- `MAX_EPOCHS = 25`
-- `PATIENCE = 5`
+- `MAX_EPOCHS = 100`
+- `PATIENCE = 10`
 - optimizer: AdamW
 - gradient clipping: max norm 5.0
 - fold별 best checkpoint 기준: validation fold `within_t_plus_2_auprc`
