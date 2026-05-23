@@ -21,7 +21,7 @@
 - 제외 컬럼: `subject_id`, `hadm_id`, `stay_id`, `bin`, `bin_start`, `bin_end`, `split`, `intime`, `outtime`, `delirium`, `ever_delirium`, `los_hours`, `admission_type`, `specialty`
 - 포함 컬럼: `hours`
 - `hours`: 현재 bin까지의 ICU 경과시간
-- `prev_delirium`: 직전 12시간 bin의 delirium 결과, binary feature로 포함
+- `current_delirium`: 현재 anchor/input bin의 delirium 결과, binary feature로 포함
 - `race`: categorical feature로 포함
 - `los_hours`: 전체 ICU 재원시간이므로 미래 정보 성격으로 제외
 
@@ -33,7 +33,7 @@
 
 Catalog의 `feature_name`과 정확히 일치하는 binary/categorical 변수만 해당 그룹으로 분류합니다. 그 외 binned aggregation 파생 컬럼은 numeric feature로 처리합니다.
 
-`prev_delirium`은 transform 단계에서 만든 파생 feature라 catalog에 직접 없으므로 preprocessing에서 binary로 명시합니다. `race`도 catalog에 직접 없으므로 categorical로 명시합니다.
+`current_delirium`은 transform 단계에서 만든 파생 feature라 catalog에 직접 없으므로 preprocessing에서 binary로 명시합니다. `race`도 catalog에 직접 없으므로 categorical로 명시합니다.
 
 ## Preprocessing 규칙
 
@@ -56,9 +56,10 @@ Catalog의 `feature_name`과 정확히 일치하는 binary/categorical 변수만
 - 실제 input bin: `(stay_id, bin)` 기준 feature row lookup
 - sequence 1개: `input_bins`의 각 time step을 feature vector로 바꾼 `(time, feature)` matrix
 - 전체 input tensor: sequence별 matrix를 쌓은 `(sequence, time, feature)` array
-- target: `y_t`, `y_t_plus_1`, `y_t_plus_2`
-- target mask: `y_t_mask`, `y_t_plus_1_mask`, `y_t_plus_2_mask`
-- binary target: `y_t`, `y_t_plus_1`, `y_t_plus_2` 중 하나라도 positive인 `y_within_t_plus_2`; metadata에는 `y_within_t_plus_1`도 함께 저장
+- input mask: 실제 input bin은 `1`, left-padded `PAD` step은 `0`
+- target: `y_t_plus_1`, `y_t_plus_2`
+- target mask: `y_t_plus_1_mask`, `y_t_plus_2_mask`
+- binary target: `y_t_plus_1`, `y_t_plus_2` 중 하나라도 positive인 `y_within_t_plus_2`; metadata에는 `y_within_t_plus_1`도 함께 저장
 
 ## 출력 파일
 
@@ -66,6 +67,8 @@ Catalog의 `feature_name`과 정확히 일치하는 binary/categorical 변수만
 
 - `X_train_lstm.npy`
 - `X_test_lstm.npy`
+- `X_train_input_mask_lstm.npy`
+- `X_test_input_mask_lstm.npy`
 - `y_train_lstm.npy`
 - `y_test_lstm.npy`
 - `y_train_steps_lstm.npy`

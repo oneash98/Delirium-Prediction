@@ -1,6 +1,6 @@
 # 8_model_interpretation
 
-`src/8_model_interpretation.ipynb`는 `src/6_modeling.ipynb`에서 학습한 기존 encoder-decoder multi-horizon LSTM만 대상으로 모델 해석을 수행합니다.
+`src/8_model_interpretation.ipynb`는 `src/6_modeling.ipynb`에서 학습한 future-only multi-horizon XGBoost 모델을 대상으로 모델 해석을 수행합니다.
 
 ## 입력 파일
 
@@ -17,7 +17,7 @@
 
 `models/`:
 
-- `lstm_best_model_gpu.pt`
+- `xgb_multi_horizon.joblib`
 
 `models/clean_data/`:
 
@@ -25,24 +25,21 @@
 
 ## 해석 방법
 
-- Permutation feature importance: 각 feature의 `t-3~t` trajectory 전체를 sequence 사이에서 섞고, `within_t_plus_2` AUPRC 감소량을 중요도로 사용합니다.
-- Permutation time-step importance: `t-3`, `t-2`, `t-1`, `t` 각 time step의 전체 feature vector를 sequence 사이에서 섞고 AUPRC 감소량을 계산합니다.
+- Permutation feature importance: anchor `t` feature를 sequence 사이에서 섞고, `within_t_plus_2` AUPRC 감소량을 중요도로 사용합니다.
 - SHAP: `RUN_SHAP = True`로 설정한 경우 선택 horizon logit에 대해 SHAP feature importance를 계산합니다.
 
 ## 출력 파일
 
 `outputs/model_interpretation/`:
 
-- `encoder_decoder_lstm_permutation_feature_importance.csv`
-- `encoder_decoder_lstm_permutation_time_importance.csv`
-- `encoder_decoder_lstm_shap_feature_importance.csv` (`RUN_SHAP = True`일 때)
+- `xgb_multi_horizon_permutation_feature_importance.csv`
+- `xgb_multi_horizon_shap_feature_importance.csv` (`RUN_SHAP = True`일 때)
 
 `outputs/model_interpretation/figures/`:
 
-- `encoder_decoder_lstm_permutation_feature_importance_top.png`
-- `encoder_decoder_lstm_permutation_time_importance.png`
-- `encoder_decoder_lstm_shap_feature_importance_top.png` (`RUN_SHAP = True`일 때)
+- `xgb_multi_horizon_permutation_feature_importance_top.png`
+- `xgb_multi_horizon_shap_feature_importance_top.png` (`RUN_SHAP = True`일 때)
 
 ## 주의 사항
 
-현재 notebook은 기존 encoder-decoder LSTM checkpoint인 `models/lstm_best_model_gpu.pt`가 있는 상태에서 실행합니다. 먼저 `src/6_modeling.ipynb`를 실행해 encoder-decoder LSTM을 학습하고 저장합니다.
+현재 notebook은 `models/xgb_multi_horizon.joblib`가 있는 상태에서 실행합니다. 먼저 `src/6_modeling.ipynb`를 실행해 multi-horizon XGBoost 모델을 학습하고 저장합니다.

@@ -139,7 +139,7 @@ charttime 기준 wide table과 별도로, 12시간 bin을 row 단위로 하는 `
 - `most recent`: 각 bin 종료 시점 기준 가장 최근 측정값을 사용합니다. 해당 bin에 측정값이 없으면 같은 stay에서 이전에 관측된 가장 최근값을 사용합니다. 첫 번째 bin에 값이 없고 두 번째 bin의 최신값이 있으면, 두 번째 bin의 최신값으로 첫 번째 bin을 채웁니다. 두 번째 bin도 없으면 결측으로 둡니다.
   - `ammonia`는 값 컬럼과 별도로 `ammonia_measured` 컬럼을 추가합니다. 해당 12시간 bin 안에 실제 ammonia 측정값이 있으면 `1`, 없으면 `0`입니다.
 - `at least once`: medication, delirium assessment 같은 point event는 bin 안에 한 번이라도 있으면 `1`, 없으면 `0`입니다.
-- `prev_delirium`: 같은 stay의 직전 12시간 bin에서의 `delirium` 결과입니다. 첫 bin은 입원 전 직전 delirium 결과가 없으므로 `0`으로 둡니다.
+- `current_delirium`: 같은 stay/bin의 현재 `delirium` 결과입니다. 모델 anchor `t`의 현재 상태 feature로 사용하며, 결측 label이 있으면 transform 단계에서 오류를 냅니다.
 - `static`: height/weight 같은 event-derived static feature는 stay 안의 첫 관측값을 전체 bin에 반복합니다. `age`, `gender`는 admission/patient 정보에서 가져옵니다.
 - procedure/device interval은 12시간 bin과 겹치면 해당 procedure feature를 `1`로 표시합니다. charttime 기준 wide table과 달리 interval과 bin의 overlap 기준입니다.
 
@@ -147,7 +147,7 @@ charttime 기준 wide table과 별도로, 12시간 bin을 row 단위로 하는 `
 
 Criteria는 12시간 라벨링과 wide table 생성 후 적용합니다.
 
-모델링은 12시간 bin을 time step으로 쓰는 LSTM 구조를 전제로 합니다. Transform 단계의 cohort inclusion은 ICU LOS 24시간 이상으로 적용하고, 4개 input step 및 이후 target step을 만들 수 없는 sequence는 train/test construction 단계에서 제외합니다.
+모델링은 12시간 bin을 time step으로 쓰는 LSTM 구조를 전제로 합니다. Transform 단계의 cohort inclusion은 ICU LOS 24시간 이상으로 적용하고, 미래 `t+1` label이 없는 마지막 anchor는 train/test construction 단계에서 제외합니다.
 
 적용 순서:
 
