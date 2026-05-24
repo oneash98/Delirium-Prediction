@@ -21,7 +21,7 @@
 - 제외 컬럼: `subject_id`, `hadm_id`, `stay_id`, `bin`, `bin_start`, `bin_end`, `split`, `intime`, `outtime`, `delirium`, `ever_delirium`, `los_hours`, `admission_type`, `specialty`
 - 포함 컬럼: `hours`
 - `hours`: 현재 bin까지의 ICU 경과시간
-- `current_delirium`: 현재 anchor/input bin의 delirium 결과, binary feature로 포함
+- `prev_delirium`: 같은 stay에서 직전 12시간 bin의 delirium 결과, binary feature로 포함
 - `race`: categorical feature로 포함
 - `los_hours`: 전체 ICU 재원시간이므로 미래 정보 성격으로 제외
 
@@ -33,16 +33,16 @@
 
 Catalog의 `feature_name`과 정확히 일치하는 binary/categorical 변수만 해당 그룹으로 분류합니다. 그 외 binned aggregation 파생 컬럼은 numeric feature로 처리합니다.
 
-`current_delirium`은 transform 단계에서 만든 파생 feature라 catalog에 직접 없으므로 preprocessing에서 binary로 명시합니다. `race`도 catalog에 직접 없으므로 categorical로 명시합니다.
+`prev_delirium`은 transform 단계에서 만든 파생 feature라 catalog에 직접 없으므로 preprocessing에서 binary로 명시합니다. `race`도 catalog에 직접 없으므로 categorical로 명시합니다.
 
 ## Preprocessing 규칙
 
 - train split 기준으로만 missingness, imputation 값, scaling 값, category level을 fit
 - 결측치가 심한 변수는 명시 목록 기준으로 `binned`에서 실제 제거
-- aggregation 파생 변수는 모델 입력에서 `{feature}_mean`, `{feature}_min`, `{feature}_max`만 유지하고 `{feature}_median`, `{feature}_std`, `{feature}_count`, `{feature}_latest`는 제외
+- aggregation 파생 변수는 모델 입력에서 `{feature}_min`, `{feature}_max`, `{feature}_mean`만 유지하고 `{feature}_median`, `{feature}_std`, `{feature}_count`, `{feature}_latest`는 제외
 - numeric feature: train 기준 imputation 후 `StandardScaler` 적용
 - lab/most recent numeric feature: 해당 컬럼의 train median으로 imputation
-- aggregation numeric feature: 모델 입력에 남긴 `{feature}_mean`, `{feature}_min`, `{feature}_max`는 같은 feature의 `{feature}_latest` train median으로 imputation
+- aggregation numeric feature: 모델 입력에 남긴 `{feature}_min`, `{feature}_max`, `{feature}_mean`은 같은 feature의 `{feature}_latest` train median으로 imputation
 - aggregation의 `{feature}_count`, `{feature}_std` 및 기타 numeric feature: 해당 컬럼의 train median으로 imputation
 - numeric binary feature: `0/1` 그대로 사용, missing은 `0`
 - text binary feature: train level 기준 one-hot
@@ -58,9 +58,9 @@ Catalog의 `feature_name`과 정확히 일치하는 binary/categorical 변수만
 - sequence 1개: `input_bins`의 각 time step을 feature vector로 바꾼 `(time, feature)` matrix
 - 전체 input tensor: sequence별 matrix를 쌓은 `(sequence, time, feature)` array
 - input mask: 실제 input bin은 `1`, left-padded `PAD` step은 `0`
-- target: `y_t_plus_1`, `y_t_plus_2`
-- target mask: `y_t_plus_1_mask`, `y_t_plus_2_mask`
-- binary target: `y_t_plus_1`, `y_t_plus_2` 중 하나라도 positive인 `y_within_t_plus_2`; metadata에는 `y_within_t_plus_1`도 함께 저장
+- target: `y_t`, `y_t_plus_1`, `y_t_plus_2`
+- target mask: `y_t_mask`, `y_t_plus_1_mask`, `y_t_plus_2_mask`
+- binary target: `y_t`, `y_t_plus_1`, `y_t_plus_2` 중 하나라도 positive인 `y_within_t_plus_2`; metadata에는 `y_within_t`, `y_within_t_plus_1`도 함께 저장
 
 ## 출력 파일
 

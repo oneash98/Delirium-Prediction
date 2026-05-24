@@ -17,8 +17,8 @@ MIMIC-IV 기반 Parkinson 코호트에서 ICU 섬망 평가를 outcome으로 사
 - `src/3_eda.ipynb`: transform 산출물을 읽어 환자 기본정보와 12시간 bin-level feature missingness EDA를 수행합니다.
 - `src/4_train_test_construction.ipynb`: transform 산출물을 읽어 subject-level train/test split과 LSTM sequence index를 만듭니다.
 - `src/5_data_preprocessing.ipynb`: split 산출물과 sequence index를 읽어 LSTM tensor와 target mask를 생성합니다.
-- `src/6_modeling.ipynb`: within `t+1~t+2` 비교 모델을 먼저 학습한 뒤 multi-horizon XGBoost, multi-output MLP, masked LSTM을 추가 테스트로 학습합니다.
-- `src/7_result_analysis.ipynb`: 모델링 산출물을 읽어 결과 시각화와 current delirium 상태별 추가 평가를 수행합니다.
+- `src/6_modeling.ipynb`: within `t~t+2` 비교 모델을 먼저 학습한 뒤 multi-horizon XGBoost, multi-output MLP, masked LSTM을 추가 테스트로 학습합니다.
+- `src/7_result_analysis.ipynb`: 모델링 산출물을 읽어 결과 시각화와 previous delirium 상태별 추가 평가를 수행합니다.
 - `src/8_model_interpretation.ipynb`: encoder-decoder multi-horizon LSTM 모델 해석을 수행합니다.
 - `src/extraction_variable_catalog.md`: 추출 대상 변수 catalog 문서입니다.
 - `src/extraction_variable_catalog.csv`: 추출 대상 변수 catalog의 CSV 버전입니다.
@@ -42,8 +42,8 @@ MIMIC-IV 기반 Parkinson 코호트에서 ICU 섬망 평가를 outcome으로 사
 4. 필요 시 `3_eda.ipynb`를 실행해 cohort EDA를 확인합니다.
 5. `4_train_test_construction.ipynb`를 실행해 subject-level train/test split과 LSTM sequence index를 생성합니다.
 6. `5_data_preprocessing.ipynb`를 실행해 tensor와 target mask를 생성합니다.
-7. `6_modeling.ipynb`를 실행해 within `t+1~t+2` 비교 모델과 multi-horizon 추가 테스트 모델을 학습합니다.
-8. 필요 시 `7_result_analysis.ipynb`를 실행해 결과 시각화와 current delirium 상태별 평가를 확인합니다.
+7. `6_modeling.ipynb`를 실행해 within `t~t+2` 비교 모델과 multi-horizon 추가 테스트 모델을 학습합니다.
+8. 필요 시 `7_result_analysis.ipynb`를 실행해 결과 시각화와 previous delirium 상태별 평가를 확인합니다.
 9. 필요 시 `8_model_interpretation.ipynb`를 실행해 encoder-decoder LSTM 모델 해석을 수행합니다.
 
 노트북은 Jupyter 작업 디렉터리를 `Parkinson/src`로 둔 상태에서 위에서 아래로 실행하는 것을 전제로 합니다. `PROJECT_DIR`은 `Path.cwd().resolve().parent`로 고정하며, 실행 위치를 추론하는 fallback 코드를 추가하지 않습니다.
@@ -120,14 +120,14 @@ Parkinson/data/*.csv
        lstm_best_model_gpu_config.json
   -> src/7_result_analysis.ipynb
   -> outputs/modeling/
-      within_t_plus_2_current_delirium_stratified_metrics.csv
-      lstm_current_delirium_stratified_metrics.csv
-      multi_horizon_models_current_delirium_stratified_metrics.csv
-      multi_horizon_models_current_delirium_horizon_metrics.csv
-      within_t_plus_2_test_predictions_all_models_with_current_delirium.csv
-      xgb_multi_horizon_test_predictions_with_current_delirium.csv
-      mlp_multi_horizon_test_predictions_with_current_delirium.csv
-      lstm_gpu_test_predictions_with_current_delirium.csv
+      within_t_plus_2_prev_delirium_stratified_metrics.csv
+      lstm_prev_delirium_stratified_metrics.csv
+      multi_horizon_models_prev_delirium_stratified_metrics.csv
+      multi_horizon_models_prev_delirium_horizon_metrics.csv
+      within_t_plus_2_test_predictions_all_models_with_prev_delirium.csv
+      xgb_multi_horizon_test_predictions_with_prev_delirium.csv
+      mlp_multi_horizon_test_predictions_with_prev_delirium.csv
+      lstm_gpu_test_predictions_with_prev_delirium.csv
   -> src/8_model_interpretation.ipynb
   -> outputs/model_interpretation/
        encoder_decoder_lstm_permutation_feature_importance.csv
@@ -177,23 +177,23 @@ Parkinson/data/*.csv
 
 - key: `example_id`, `subject_id`, `hadm_id`, `stay_id`, `anchor_bin`
 - input: `input_bins`, `input_mask`
-- output: `y_t_plus_1`, `y_t_plus_2`
-- loss mask: `y_t_plus_1_mask`, `y_t_plus_2_mask`
+- output: `y_t`, `y_t_plus_1`, `y_t_plus_2`
+- loss mask: `y_t_mask`, `y_t_plus_1_mask`, `y_t_plus_2_mask`
 - split: `4_train_test_construction.ipynb` 실행 후 subject-level random train/test split
 
 Feature selection, imputation, PAD zero-vector 변환은 `5_data_preprocessing.ipynb`에서 train 기준으로 수행합니다.
 
-기본 모델링 방향은 12시간 bin을 time step으로 쓰는 LSTM입니다. 각 stay 안에서 anchor bin을 오른쪽으로 sliding하며 sequence row를 생성합니다. 첫 anchor는 `t1`이며, PAD 3개와 `t1`만 있는 sequence를 허용합니다. 최대 4개 time step의 feature를 입력으로 사용하고, 실제 input bin 수가 4개보다 적으면 왼쪽을 `PAD`로 채웁니다. 출력은 다음 2개 future time step(`t+1`, `t+2`)의 delirium 여부이며, 실제 target이 없는 위치는 target mask를 0으로 설정해 loss에서 제외합니다. Transform 단계 cohort inclusion은 ICU LOS 24시간 이상입니다. Candidate sequence count는 미래 label이 하나 이상 있는 anchor 수를 기록합니다.
+기본 모델링 방향은 12시간 bin을 time step으로 쓰는 LSTM입니다. 각 stay 안에서 anchor bin을 오른쪽으로 sliding하며 sequence row를 생성합니다. 첫 anchor는 `t1`이며, PAD 3개와 `t1`만 있는 sequence를 허용합니다. 최대 4개 time step의 feature를 입력으로 사용하고, 실제 input bin 수가 4개보다 적으면 왼쪽을 `PAD`로 채웁니다. 출력은 anchor bin부터 3개 target step(`t`, `t+1`, `t+2`)의 delirium 여부이며, 실제 target이 없는 위치는 target mask를 0으로 설정해 loss에서 제외합니다. Transform 단계 cohort inclusion은 ICU LOS 24시간 이상입니다. Candidate sequence count는 현재 label이 있는 anchor 수를 기록합니다.
 
-12시간 bin-level table에는 `current_delirium` feature가 포함됩니다. 이는 같은 stay/bin의 현재 `delirium` 결과입니다.
-Preprocessing 단계에서는 `hours`를 현재 bin까지의 ICU 경과시간 feature로 포함하고, `race`를 categorical feature로 포함하며, 전체 ICU 재원시간인 `los_hours`는 제외합니다. `current_delirium`은 catalog에 없는 파생 feature지만 binary feature로 포함합니다. Feature type은 `extraction_variable_catalog.csv`를 기준으로 분류하며, catalog binary/text binary, categorical, numeric feature를 분리해 처리합니다.
+12시간 bin-level table에는 `prev_delirium` feature가 포함됩니다. 이는 같은 stay 안에서 직전 12시간 bin의 `delirium` 결과이며, 첫 bin은 `0`으로 둡니다.
+Preprocessing 단계에서는 `hours`를 현재 bin까지의 ICU 경과시간 feature로 포함하고, `race`를 categorical feature로 포함하며, 전체 ICU 재원시간인 `los_hours`는 제외합니다. `prev_delirium`은 catalog에 없는 파생 feature지만 binary feature로 포함합니다. Feature type은 `extraction_variable_catalog.csv`를 기준으로 분류하며, catalog binary/text binary, categorical, numeric feature를 분리해 처리합니다.
 
 ## 작업 시 주의사항
 
 - 이 프로젝트는 범용 서비스나 패키지 개발이 아니라 정해진 연구 설계에 맞춘 데이터분석 노트북 작업입니다. 사용자가 명시하지 않은 실행 옵션, CLI, 경로/입력조건 자동 감지, fallback 분기, 누락 파일 대체 생성 로직을 추가하지 않습니다.
 - 노트북은 연구 설계와 실행 순서가 드러나도록 직선적으로 작성합니다. “이런 경우/저런 경우”를 가정해 분기하지 말고, 정해진 입력 파일, 컬럼, 경로, target 정의가 존재한다고 보고 사용합니다.
 - Parkinson 노트북의 작업 위치는 `Parkinson/src`로 고정합니다. 경로 설정은 `PROJECT_DIR = Path.cwd().resolve().parent`를 사용하고, `cwd.name` 조건문으로 repository root나 다른 위치를 자동 탐색하지 않습니다.
-- 연구 설계에서 고정된 조건은 config 옵션으로 만들지 않습니다. 예를 들어 within `t+1~t+2` 모델링은 full `t+1~t+2` target이 모두 관측된 row만 사용하며, partial target window 허용 옵션을 만들지 않습니다.
+- 연구 설계에서 고정된 조건은 config 옵션으로 만들지 않습니다. 예를 들어 within `t~t+2` 모델링은 full `t~t+2` target이 모두 관측된 row만 사용하며, partial target window 허용 옵션을 만들지 않습니다.
 - 단, XGB/LightGBM처럼 GPU 학습이 환경 문제로 실패할 수 있는 모델은 같은 연구 설계를 유지한 채 CPU로 재학습하는 fallback을 둡니다. 이 경우 결과 테이블에 fallback 여부를 남깁니다.
 - 노트북 단독 실행이 요청된 분석에서는 helper `.py` 파일이나 CLI 실행 경로를 새로 만들지 않습니다. 필요한 구현은 해당 `.ipynb` 안에 둡니다.
 - 사용자가 명시적으로 요청하지 않은 기존 주석은 수정하거나 삭제하지 않습니다.

@@ -25,7 +25,7 @@
 
 ## 해석 방법
 
-- Permutation feature importance: anchor `t` feature를 sequence 사이에서 섞고, `within_t_plus_2` AUPRC 감소량을 중요도로 사용합니다.
+- Permutation feature importance: anchor `t` feature를 sequence 사이에서 섞고, `t~t+2` 기준 `within_t_plus_2` AUPRC 감소량을 중요도로 사용합니다.
 - SHAP: `RUN_SHAP = True`로 설정한 경우 선택 horizon logit에 대해 SHAP feature importance를 계산합니다.
 
 ## 출력 파일
