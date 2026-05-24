@@ -1,0 +1,2 @@
+auroc,auprc,sensitivity,specificity,ppv,npv,tp,fp,tn,fn,model,split,target,input,optuna_best_value,gpu_requested,fallback_reason,C,penalty
+0.742934472934473,0.6489748565654401,0.7481481481481481,0.5879120879120879,0.5287958115183246,0.7906403940886699,505,450,642,170,LR,test,within_t_plus_2,anchor_t_point_only,0.6504004015830688,False,,0.04445558067387948,l1

@@ -1,0 +1,2 @@
+auroc,auprc,sensitivity,specificity,ppv,npv,tp,fp,tn,fn,model,split,target,target_window,uses_input_mask,input,optuna_best_value,optuna_best_trial_number,final_epochs,num_layers,hidden_size,dropout,lr,batch_size,weight_decay
+0.7344125627458961,0.6521809030602671,0.6533333333333333,0.6959706959706959,0.5705045278137129,0.7645875251509054,441,332,760,234,LSTM,test,within_t_plus_2,t_to_t_plus_2,True,masked_sequence_up_to_t,0.5946559318400053,72,10,1,64,0.45085527821622784,0.0002740508926405525,32,0.00016906687863340968
