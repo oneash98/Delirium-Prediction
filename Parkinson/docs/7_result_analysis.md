@@ -1,15 +1,20 @@
 # 7_result_analysis
 
-`src/7_result_analysis.ipynb`는 `src/6_modeling.ipynb`의 모델링 산출물을 읽어 결과 시각화와 previous delirium 상태별 추가 평가를 수행합니다.
+`src/7_result_analysis.ipynb`는 `src/6_modeling.ipynb`의 모델링 산출물을 읽어 test 성능을 요약하고, ROC/PR curve와 previous delirium 상태별 추가 평가를 확인합니다.
 
 ## 목적
 
-- within `t~t+2` 비교 모델의 test 성능 시각화
-- 모델별 row-level predicted probability 분포 확인
-- multi-horizon XGBoost, multi-output MLP, encoder-decoder LSTM의 horizon별 성능 비교
-- single-output LSTM과 multi-horizon 추가 테스트 모델의 previous delirium 상태별 평가
-- 현재 delirium이 없던 case에서 future delirium 예측 성능 평가
-- 현재 delirium이 있던 case에서 future no-delirium 예측 성능 평가
+- within `t~t+2` 비교 모델의 test 핵심 metric 확인
+- multi-horizon XGBoost, multi-output MLP, encoder-decoder LSTM의 within `t+2` 및 horizon별 핵심 metric 확인
+- 전체 test set 기준 ROC/PR curve 확인
+- XGB multi-horizon 모델의 previous delirium 상태별 평가
+- 이전 bin에 delirium이 없던 case에서 future delirium 예측 성능 평가
+- 이전 bin에 delirium이 있던 case에서 future delirium 예측 성능 평가
+
+노트북에서 화면에 우선 표시하는 핵심 지표는 다음과 같습니다.
+
+- within `t+2`: model, AUROC, AUPRC, sensitivity, specificity, PPV, NPV
+- multi-horizon: model, within `t+2`의 AUROC/AUPRC/sensitivity/specificity/PPV/NPV, 그리고 `t`, `t+1`, `t+2` 각각의 AUROC/AUPRC
 
 ## 입력 파일
 
@@ -42,28 +47,32 @@ Previous delirium 여부는 `events_12h_binned_with_split.csv`의 anchor row에 
 
 ## 평가 정의
 
-Future delirium 평가:
+Previous delirium 기준 층화 평가는 모든 group에서 delirium 발생을 positive class로 두고 계산합니다.
 
-- 대상: `no_prev_delirium`
-- true label: within `t~t+2` delirium 발생 여부
-- probability: 각 모델의 delirium probability
+- `no_prev_delirium`: 이전 12h bin에 delirium이 없던 case에서 within `t~t+2` delirium 발생 여부 평가
+- `prev_delirium`: 이전 12h bin에 delirium이 있던 case에서 within `t~t+2` delirium 발생 여부 평가
 
-Future no-delirium 평가:
+두 group 모두 true label은 delirium 발생 여부이며, probability는 XGB multi-horizon 모델의 delirium probability를 그대로 사용합니다.
 
-- 대상: `prev_delirium`
-- true label: within `t~t+2` 동안 delirium이 없는지 여부
-- probability: `1 - delirium_probability`
+XGB multi-horizon 모델은 추가로 horizon별 `y_t`, `y_t_plus_1`, `y_t_plus_2`에 대해 같은 방식으로 각 horizon의 delirium 발생을 positive class로 평가합니다.
 
-Multi-horizon 추가 테스트 모델은 추가로 horizon별 `y_t`, `y_t_plus_1`, `y_t_plus_2`에 대해 같은 방식으로 평가합니다. 즉, 이전 bin delirium이 없던 case에서는 각 horizon의 delirium 발생을 보고, 이전 bin delirium이 있던 case에서는 각 horizon의 non-delirium을 봅니다.
+화면 표시용 table에서는 `prev_delirium_group`, `target` 같은 내부 관리용 column을 숨기고 `comparison`, `model`, 핵심 metric 중심으로 보여줍니다. 원본 상세 column은 저장되는 CSV에 유지합니다.
+
+## 분석 흐름
+
+노트북은 다음 순서로 결과를 확인하도록 정리되어 있습니다.
+
+1. 모델링 산출물 로딩 및 전체 test 핵심 metric 확인
+2. 전체 test set 기준 within `t+2`, multi-horizon ROC/PR curve 확인
+3. Previous delirium 기준 층화 평가와 시각화
+4. Previous delirium 정보가 결합된 prediction table 저장
 
 ## 출력 파일
 
 `outputs/modeling/`:
 
-- `within_t_plus_2_prev_delirium_stratified_metrics.csv`
-- `lstm_prev_delirium_stratified_metrics.csv`
-- `multi_horizon_models_prev_delirium_stratified_metrics.csv`
-- `multi_horizon_models_prev_delirium_horizon_metrics.csv`
+- `xgb_multi_horizon_prev_delirium_stratified_metrics.csv`
+- `xgb_multi_horizon_prev_delirium_horizon_metrics.csv`
 - `within_t_plus_2_test_predictions_all_models_with_prev_delirium.csv`
 - `xgb_multi_horizon_test_predictions_with_prev_delirium.csv`
 - `mlp_multi_horizon_test_predictions_with_prev_delirium.csv`
@@ -71,14 +80,11 @@ Multi-horizon 추가 테스트 모델은 추가로 horizon별 `y_t`, `y_t_plus_1
 
 `outputs/modeling/figures/`:
 
-- `within_t_plus_2_test_auprc_by_model.png`
-- `within_t_plus_2_probability_distribution_by_model.png`
-- `result_analysis_multi_horizon_lstm_metrics.png`
-- `multi_horizon_test_within_t_plus_2_auprc_by_model.png`
-- `multi_horizon_test_horizon_auprc_by_model.png`
-- `within_t_plus_2_prev_delirium_stratified_auprc.png`
-- `lstm_prev_delirium_stratified_auprc_auroc.png`
-- `multi_horizon_models_prev_delirium_*_horizon_auprc.png`
+- `within_t_plus_2_test_roc_pr_curves_by_model.png`
+- `multi_horizon_within_t_plus_2_roc_pr_curves_by_model.png`
+- `multi_horizon_test_horizon_roc_pr_curves_by_model.png`
+- `xgb_multi_horizon_prev_delirium_within_t_plus_2_auprc.png`
+- `xgb_multi_horizon_prev_delirium_horizon_auprc.png`
 
 ## 실행 순서
 
