@@ -1,6 +1,6 @@
 # 6_modeling
 
-`src/6_modeling.ipynb`는 기존 전처리 산출물(`processed/data_split/`)을 그대로 사용해 within `t~t+2` 비교 모델을 먼저 학습하고, 마지막에 multi-horizon XGBoost, multi-output MLP, encoder-decoder LSTM을 추가 테스트로 학습합니다. 모델링 구현은 해당 `.ipynb` 안에 둡니다.
+`src/6_modeling.ipynb`는 기존 전처리 산출물(`processed/data_split/`)을 그대로 사용해 within `t~t+2` 비교 모델을 먼저 학습하고, 마지막에 multi-horizon LightGBM, XGBoost, multi-output MLP, encoder-decoder LSTM을 추가 테스트로 학습합니다. 모델링 구현은 해당 `.ipynb` 안에 둡니다.
 
 ## Within t+2 비교 모델
 
@@ -31,7 +31,7 @@ Parkinson/src/6_modeling.ipynb
 4. 공통 subject-level CV split 생성: full-window train metadata 기준 subject split을 만든 뒤, within 비교 모델과 multi-horizon 모델에 같은 row mask를 적용합니다.
 5. Within `t~t+2` 비교 모델 학습: LR/RF/XGB/LightGBM, MLP, single-output LSTM 순서로 Optuna tuning과 전체 train 재학습/test 평가를 수행합니다.
 6. Within `t~t+2` 최종 비교 저장: 모델별 test metric summary와 모델별 probability를 합친 row-level prediction table을 저장합니다.
-7. Multi-horizon 추가 테스트: XGBoost horizon별 독립 모델, multi-output MLP, encoder-decoder LSTM을 학습하고 horizon별 test probability와 metric을 저장합니다.
+7. Multi-horizon 추가 테스트: LightGBM/XGBoost horizon별 독립 모델, multi-output MLP, encoder-decoder LSTM을 학습하고 horizon별 test probability와 metric을 저장합니다.
 
 ### Within t+2 구현 셀 구조
 
@@ -145,7 +145,7 @@ Single-output LSTM:
 - `models/within_t_plus_2/lstm_within_t_plus_2_best_model.pt`
 - `models/within_t_plus_2/lstm_within_t_plus_2_best_model_config.json`
 
-Multi-horizon 추가 테스트는 `5_data_preprocessing.ipynb`에서 생성한 LSTM tensor 중 within `t~t+2` 단일예측 모델과 같은 full-window row만 사용합니다. XGBoost와 multi-output MLP는 anchor `t` 시점 feature를 입력으로 쓰고, encoder-decoder LSTM은 `t-3~t` sequence 전체를 입력으로 사용합니다.
+Multi-horizon 추가 테스트는 `5_data_preprocessing.ipynb`에서 생성한 LSTM tensor 중 within `t~t+2` 단일예측 모델과 같은 full-window row만 사용합니다. LightGBM, XGBoost, multi-output MLP는 anchor `t` 시점 feature를 입력으로 쓰고, encoder-decoder LSTM은 `t-3~t` sequence 전체를 입력으로 사용합니다.
 
 노트북은 주피터에서 위에서 아래로 한 셀씩 실행하는 흐름을 전제로 구성합니다. 각 단계는 준비, 로딩, subject-level CV 구성, 모델/평가 함수 정의, hyperparameter tuning, 전체 train 재학습, test 평가, 결과 저장 순서입니다.
 
@@ -247,6 +247,13 @@ Optuna 설정:
 - `PATIENCE = 10`
 - sampler: `TPESampler(seed=RANDOM_STATE)`
 
+LightGBM horizon별 독립 모델:
+
+- 입력: anchor `t` 시점 feature
+- 출력: `y_t`, `y_t_plus_1`, `y_t_plus_2` 각각에 대한 독립 binary classifier
+- 탐색 공간: within `t~t+2` LightGBM baseline과 동일
+- 평가: horizon별 probability를 `masked_horizon_metrics`에 넣어 within-window AUPRC, macro AUPRC, horizon별 metric 계산
+
 XGBoost horizon별 독립 모델:
 
 - 입력: anchor `t` 시점 feature
@@ -279,7 +286,13 @@ Encoder-decoder LSTM 탐색 공간:
 
 `outputs/modeling/`:
 
-- `multi_horizon_test_metrics_summary.csv`: XGBoost, multi-output MLP, encoder-decoder LSTM의 multi-horizon test summary.
+- `multi_horizon_test_metrics_summary.csv`: LightGBM, XGBoost, multi-output MLP, encoder-decoder LSTM의 multi-horizon test summary.
+- `lgbm_multi_horizon_tuning_results.csv`
+- `lgbm_multi_horizon_optuna_trials.csv`
+- `lgbm_multi_horizon_cv_fold_metrics.csv`
+- `lgbm_multi_horizon_test_metrics.csv`
+- `lgbm_multi_horizon_test_metrics_by_horizon.csv`
+- `lgbm_multi_horizon_test_predictions.csv`
 - `xgb_multi_horizon_tuning_results.csv`
 - `xgb_multi_horizon_optuna_trials.csv`
 - `xgb_multi_horizon_cv_fold_metrics.csv`
@@ -311,6 +324,7 @@ Encoder-decoder LSTM 탐색 공간:
 - `lstm_best_model_gpu.pt`: model state dict, parameters, CV/test metric이 포함된 PyTorch payload.
 - `lstm_best_model_gpu_config.json`: best model 설정과 평가 결과 요약.
 - `xgb_multi_horizon.joblib`: horizon별 XGBoost model payload.
+- `lgbm_multi_horizon.joblib`: horizon별 LightGBM model payload.
 - `mlp_multi_horizon_best_model.pt`: multi-output MLP model payload.
 
 ## QA 체크
