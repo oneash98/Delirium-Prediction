@@ -140,7 +140,7 @@ Parkinson/data/*.csv
 - `services.csv`를 필수 입력으로 사용하고 ICU 입실 시점의 `curr_service`를 `specialty`로 결합합니다.
 - ICU 재원시간이 양수인 stay만 유지합니다.
 - `1_data_extraction.ipynb`에서는 위 기준을 적용하지 않고 전체 ICU stay 테이블을 저장합니다.
-- `2_data_transform.ipynb`에서 ICU LOS 24시간 이상 기준을 적용하고 `cohort_attrition.csv`로 저장합니다.
+- `2_data_transform.ipynb`에서 ICU LOS 36시간 이상 기준을 적용하고 `cohort_attrition.csv`로 저장합니다.
 
 ## Outcome 정의
 
@@ -183,10 +183,10 @@ Parkinson/data/*.csv
 
 Feature selection, imputation, PAD zero-vector 변환은 `5_data_preprocessing.ipynb`에서 train 기준으로 수행합니다.
 
-기본 모델링 방향은 12시간 bin을 time step으로 쓰는 LSTM입니다. 각 stay 안에서 anchor bin을 오른쪽으로 sliding하며 sequence row를 생성합니다. 첫 anchor는 `t1`이며, PAD 3개와 `t1`만 있는 sequence를 허용합니다. 최대 4개 time step의 feature를 입력으로 사용하고, 실제 input bin 수가 4개보다 적으면 왼쪽을 `PAD`로 채웁니다. 출력은 anchor bin부터 3개 target step(`t`, `t+1`, `t+2`)의 delirium 여부이며, 실제 target이 없는 위치는 target mask를 0으로 설정해 loss에서 제외합니다. Transform 단계 cohort inclusion은 ICU LOS 24시간 이상입니다. Candidate sequence count는 현재 label이 있는 anchor 수를 기록합니다.
+기본 모델링 방향은 12시간 bin을 time step으로 쓰는 LSTM입니다. 각 stay 안에서 anchor bin을 오른쪽으로 sliding하며 sequence row를 생성합니다. 첫 anchor는 `t1`이며, PAD 3개와 `t1`만 있는 sequence를 허용합니다. 최대 4개 time step의 feature를 입력으로 사용하고, 실제 input bin 수가 4개보다 적으면 왼쪽을 `PAD`로 채웁니다. 출력은 anchor bin부터 3개 target step(`t`, `t+1`, `t+2`)의 delirium 여부이며, sequence index에는 실제 target이 없는 위치를 target mask 0으로 기록합니다. Transform 단계 cohort inclusion은 ICU LOS 36시간 이상입니다. Candidate sequence count는 현재 label이 있는 anchor 수를 기록합니다. `6_modeling.ipynb`의 within `t~t+2` 단일예측 모델과 multi-horizon 모델은 모두 full `t~t+2` target이 있는 row만 사용합니다.
 
 12시간 bin-level table에는 `prev_delirium` feature가 포함됩니다. 이는 같은 stay 안에서 직전 12시간 bin의 `delirium` 결과이며, 첫 bin은 `0`으로 둡니다.
-Preprocessing 단계에서는 `hours`를 현재 bin까지의 ICU 경과시간 feature로 포함하고, `race`를 categorical feature로 포함하며, 전체 ICU 재원시간인 `los_hours`는 제외합니다. `prev_delirium`은 catalog에 없는 파생 feature지만 binary feature로 포함합니다. Feature type은 `extraction_variable_catalog.csv`를 기준으로 분류하며, catalog binary/text binary, categorical, numeric feature를 분리해 처리합니다.
+Preprocessing 단계에서는 `hours`를 현재 bin까지의 ICU 경과시간 feature로 포함하고, `gender`는 `M = 1`, `F = 0` binary feature로 변환하며, `race`는 `White`, `Black/African American`, `Asian`, `Hispanic/Latino`, `Other` 5개 대분류 categorical feature로 사용합니다. 전체 ICU 재원시간인 `los_hours`는 제외하고, `prev_delirium`은 binary feature로 포함합니다. Feature type은 `extraction_variable_catalog.csv`를 기준으로 분류하며, catalog binary/text binary, categorical, numeric feature를 분리해 처리합니다.
 
 ## 작업 시 주의사항
 

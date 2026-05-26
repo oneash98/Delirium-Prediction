@@ -21,8 +21,9 @@
 - 제외 컬럼: `subject_id`, `hadm_id`, `stay_id`, `bin`, `bin_start`, `bin_end`, `split`, `intime`, `outtime`, `delirium`, `ever_delirium`, `los_hours`, `admission_type`, `specialty`
 - 포함 컬럼: `hours`
 - `hours`: 현재 bin까지의 ICU 경과시간
+- `gender`: `M = 1`, `F = 0`인 binary feature로 사용
+- `race`: `White`, `Black/African American`, `Asian`, `Hispanic/Latino`, `Other` 5개 대분류 categorical feature로 사용
 - `prev_delirium`: 같은 stay에서 직전 12시간 bin의 delirium 결과, binary feature로 포함
-- `race`: categorical feature로 포함
 - `los_hours`: 전체 ICU 재원시간이므로 미래 정보 성격으로 제외
 
 `extraction_variable_catalog.csv`의 `type`을 기준으로 feature를 분류합니다.
@@ -45,8 +46,9 @@ Catalog의 `feature_name`과 정확히 일치하는 binary/categorical 변수만
 - aggregation numeric feature: 모델 입력에 남긴 `{feature}_min`, `{feature}_max`, `{feature}_mean`은 같은 feature의 `{feature}_latest` train median으로 imputation
 - aggregation의 `{feature}_count`, `{feature}_std` 및 기타 numeric feature: 해당 컬럼의 train median으로 imputation
 - numeric binary feature: `0/1` 그대로 사용, missing은 `0`
+- `gender`: one-hot encoding 없이 `M = 1`, `F = 0`으로 변환
 - text binary feature: train level 기준 one-hot
-- categorical feature: train level 기준 one-hot
+- categorical feature: train level 기준 one-hot. `race`는 train level 확장 없이 사전 정의한 5개 대분류만 사용
 - test split은 train에서 정한 feature 목록과 preprocessing 값만 적용
 
 ## Sequence Tensor 생성

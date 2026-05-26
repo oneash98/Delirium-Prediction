@@ -1,2 +1,0 @@
-auroc,auprc,sensitivity,specificity,ppv,npv,tp,fp,tn,fn,model,split,target,input,optuna_best_value,optuna_best_trial_number,final_epochs,device,hidden_size,num_layers,dropout,lr,batch_size,weight_decay
-0.7498948582281915,0.6489641645819004,0.7985185185185185,0.5183150183150184,0.5061032863849765,0.8062678062678063,539,526,566,136,MLP,test,within_t_plus_2,anchor_t_point_only,0.6622414863291448,96,9,cuda,64,2,0.33650185456595,0.0011868837654264058,32,0.00021407584947265632

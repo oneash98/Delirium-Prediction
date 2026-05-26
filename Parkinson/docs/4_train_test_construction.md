@@ -94,4 +94,4 @@ target:
 
 `5_data_preprocessing.ipynb`는 `input_bins`의 `PAD`를 zero-vector로 변환하고, input mask를 `X_train_input_mask_lstm.npy`, `X_test_input_mask_lstm.npy`, target mask를 `y_train_step_mask_lstm.npy`, `y_test_step_mask_lstm.npy`로 저장합니다.
 
-`6_modeling.ipynb`는 masked BCE loss를 사용합니다. `target_mask = 0`인 위치는 loss와 horizon별 metric에서 제외합니다.
+`6_modeling.ipynb`는 within `t~t+2` 단일예측 모델과 multi-horizon 모델 모두 full `t~t+2` target이 있는 row만 사용합니다. 따라서 sequence index에는 partial-window row와 target mask가 남아 있어도 모델 학습/예측 row에는 포함하지 않습니다.

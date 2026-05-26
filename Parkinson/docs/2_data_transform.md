@@ -147,12 +147,12 @@ charttime 기준 wide table과 별도로, 12시간 bin을 row 단위로 하는 `
 
 Criteria는 12시간 라벨링과 wide table 생성 후 적용합니다.
 
-모델링은 12시간 bin을 time step으로 쓰는 LSTM 구조를 전제로 합니다. Transform 단계의 cohort inclusion은 ICU LOS 24시간 이상으로 적용하고, 미래 `t+1` label이 없는 마지막 anchor는 train/test construction 단계에서 제외합니다.
+모델링은 12시간 bin을 time step으로 쓰는 LSTM 구조를 전제로 합니다. Transform 단계의 cohort inclusion은 ICU LOS 36시간 이상으로 적용하고, 미래 `t+1` label이 없는 마지막 anchor는 train/test construction 단계에서 제외합니다.
 
 적용 순서:
 
 1. 전체 ICU stays from extraction
-2. 24시간 이상 ICU LOS: `icu_los_hours >= 24`
+2. 36시간 이상 ICU LOS: `icu_los_hours >= 36`
 
 12시간 window 수는 ICU LOS 기준으로 계산합니다.
 

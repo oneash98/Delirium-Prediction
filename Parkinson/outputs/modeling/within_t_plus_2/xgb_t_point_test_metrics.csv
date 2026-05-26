@@ -1,2 +1,0 @@
-auroc,auprc,sensitivity,specificity,ppv,npv,tp,fp,tn,fn,model,split,target,input,optuna_best_value,gpu_requested,fallback_reason,n_estimators,max_depth,learning_rate,subsample,colsample_bytree,min_child_weight,reg_alpha,reg_lambda
-0.7908716592049925,0.7032862297647677,0.8251851851851851,0.5485347985347986,0.5304761904761904,0.8354253835425384,557,493,599,118,XGB,test,within_t_plus_2,anchor_t_point_only,0.6975656609721552,True,,700,2,0.005277623260599966,0.6953323046472091,0.6816043227439849,1.0093311350525953,0.06672054705435969,0.21715355720272259

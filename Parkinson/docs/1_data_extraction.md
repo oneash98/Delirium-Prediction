@@ -228,7 +228,7 @@ chart, lab, medication point event는 같은 컬럼 구조로 맞춘 뒤 concat�
 
 다음 처리는 transform 단계에서 수행합니다.
 
-- LSTM 모델링을 위한 ICU LOS 24시간 이상 기준의 inclusion/exclusion criteria 적용
+- LSTM 모델링을 위한 ICU LOS 36시간 이상 기준의 inclusion/exclusion criteria 적용
 - 문자열 value의 숫자화
 - 온도, 체중, 키, FiO2 등 단위 변환
 - multi-unit feature 분리

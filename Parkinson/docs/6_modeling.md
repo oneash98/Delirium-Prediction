@@ -27,8 +27,8 @@ Parkinson/src/6_modeling.ipynb
 
 1. 실행 준비: library import, 경로 설정, 설정값, CUDA device와 seed 설정.
 2. 전처리 산출물 로딩: `required_files` 정의 후 `X_train`, `X_test`, `y_train_within_t_plus_2`, `y_test_within_t_plus_2`, horizon별 target/mask, metadata를 직접 로딩합니다.
-3. Full target window subset 생성: within `t~t+2` 비교 모델용으로 `target_available_count >= len(HORIZONS)`인 row를 별도 `*_within` 변수에 저장합니다.
-4. 공통 subject-level CV split 생성: 전체 train metadata 기준 subject split을 만든 뒤, within 비교 모델과 multi-horizon 모델에 각각 row mask를 적용합니다.
+3. Full target window subset 생성: within `t~t+2` 비교 모델과 multi-horizon 모델 모두 `target_available_count >= len(HORIZONS)`인 row만 사용합니다.
+4. 공통 subject-level CV split 생성: full-window train metadata 기준 subject split을 만든 뒤, within 비교 모델과 multi-horizon 모델에 같은 row mask를 적용합니다.
 5. Within `t~t+2` 비교 모델 학습: LR/RF/XGB/LightGBM, MLP, single-output LSTM 순서로 Optuna tuning과 전체 train 재학습/test 평가를 수행합니다.
 6. Within `t~t+2` 최종 비교 저장: 모델별 test metric summary와 모델별 probability를 합친 row-level prediction table을 저장합니다.
 7. Multi-horizon 추가 테스트: XGBoost horizon별 독립 모델, multi-output MLP, encoder-decoder LSTM을 학습하고 horizon별 test probability와 metric을 저장합니다.
@@ -145,7 +145,7 @@ Single-output LSTM:
 - `models/within_t_plus_2/lstm_within_t_plus_2_best_model.pt`
 - `models/within_t_plus_2/lstm_within_t_plus_2_best_model_config.json`
 
-Multi-horizon 추가 테스트는 `5_data_preprocessing.ipynb`에서 생성한 LSTM tensor와 horizon별 target mask를 사용합니다. XGBoost와 multi-output MLP는 anchor `t` 시점 feature를 입력으로 쓰고, encoder-decoder LSTM은 `t-3~t` sequence 전체를 입력으로 사용합니다.
+Multi-horizon 추가 테스트는 `5_data_preprocessing.ipynb`에서 생성한 LSTM tensor 중 within `t~t+2` 단일예측 모델과 같은 full-window row만 사용합니다. XGBoost와 multi-output MLP는 anchor `t` 시점 feature를 입력으로 쓰고, encoder-decoder LSTM은 `t-3~t` sequence 전체를 입력으로 사용합니다.
 
 노트북은 주피터에서 위에서 아래로 한 셀씩 실행하는 흐름을 전제로 구성합니다. 각 단계는 준비, 로딩, subject-level CV 구성, 모델/평가 함수 정의, hyperparameter tuning, 전체 train 재학습, test 평가, 결과 저장 순서입니다.
 
@@ -206,7 +206,7 @@ Multi-horizon 추가 테스트는 `5_data_preprocessing.ipynb`에서 생성한 L
 학습 loss는 `BCEWithLogitsLoss(reduction="none")`로 계산한 뒤 target mask를 곱해 평균냅니다.
 
 - `target_mask = 1`: 실제 target이 존재하는 horizon, loss와 metric에 포함
-- `target_mask = 0`: 실제 target이 없는 horizon, loss와 horizon별 metric에서 제외
+- `target_mask = 0`: sequence index에는 남을 수 있지만, `6_modeling.ipynb`의 multi-horizon 학습/예측에서는 full `t~t+2` row만 사용하므로 제외됩니다.
 
 Class imbalance 보정을 위해 horizon별 `pos_weight`를 각 fold의 train target 기준으로 계산합니다. 최종 test용 전체 train 재학습에서는 전체 train target 기준으로 다시 계산합니다.
 
@@ -258,20 +258,13 @@ Multi-output MLP:
 
 - 입력: anchor `t` 시점 feature
 - 출력: 3개 logit, 즉 `y_t`, `y_t_plus_1`, `y_t_plus_2`
-- `hidden_size`: 64, 128, 256, 512
-- `num_layers`: 1, 2
-- 고정 tail: `hidden_size / 2`, `hidden_size / 4` 두 hidden layer를 output 직전에 추가
+- 탐색 공간: within `t~t+2` single-output MLP와 동일
 - masked BCE loss: target mask가 0인 horizon은 loss에서 제외
 
 Encoder-decoder LSTM 탐색 공간:
 
-- `hidden_size`: 32, 64, 128, 256
-- `num_layers`: 1, 2
+- 탐색 공간: within `t~t+2` single-output LSTM과 동일
 - head: decoder output 뒤에 `hidden_size / 2`, `hidden_size / 4` 두 hidden layer를 고정 추가
-- `dropout`: 0.0-0.5
-- `lr`: 1e-4-3e-3, log scale
-- `batch_size`: 32, 64, 128
-- `weight_decay`: 1e-6-1e-3, log scale
 
 학습 설정:
 
