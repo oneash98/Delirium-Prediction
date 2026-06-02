@@ -14,6 +14,7 @@ Parkinson/outputs*/
 .Ds_Store
 .obsidian
 test*
+outputs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
