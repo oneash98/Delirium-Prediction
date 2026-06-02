@@ -21,6 +21,9 @@
 - `normality_summary.csv`
 - `normality_diagnostics.png`
 - `table1_characteristics.csv`
+- `delirium_assessment_interval_distribution.png`
+- `delirium_assessment_interval_summary.csv`
+- `delirium_assessment_stay_interval_summary.csv`
 
 ## 노트북 순서
 
@@ -29,6 +32,16 @@
 | 노트북 소제목 | 확인 내용 |
 | --- | --- |
 | `## EDA: 환자 기본정보` | subject/stay 수, subject-level `ever_delirium` 분포, 12시간 bin-level delirium label 분포, 기본정보 시각화, specialty 분포, age/height/weight/LOS 정규성 진단, Table 1 형태의 baseline characteristics |
+| `## Delirium assessment 간격 분포` | `all_events_filtered.csv`에서 delirium assessment timepoint를 정렬해 연속 평가 간격 histogram과 요약 CSV를 생성 |
+| `## Delirium 첫 발생 시점 분포` | subject-level 첫 delirium 발생 시점을 LOS median 이내에서 요약하고 시각화 |
+
+## Delirium assessment 간격 분포
+
+- 입력: `processed/transform/all_events_filtered.csv`
+- 동일 `stay_id`/`charttime` 중복은 하나의 assessment timepoint로 간주합니다.
+- 같은 ICU stay 안에서 연속 delirium assessment 사이의 시간 간격을 hour 단위로 계산합니다.
+- `delirium_assessment_interval_distribution.png`는 긴 tail 때문에 48시간까지 표시하고, mean/median 기준선은 전체 interval 기준으로 표시합니다.
+- 전체 interval 요약은 `delirium_assessment_interval_summary.csv`, stay별 interval 요약은 `delirium_assessment_stay_interval_summary.csv`에 저장합니다.
 
 ## EDA: 환자 기본정보
 
